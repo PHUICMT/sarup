@@ -16,16 +16,23 @@ What Sarup is built from, and the technique behind each part.
 | Storage | in-memory dict + optional SQLite | CCR (compress-and-cache-retrieval) original store |
 | Hash | SHA-256, first 24 hex chars | Deterministic, stable content key |
 | Build | hatchling | Simple PEP 621 packaging |
-| Tests | pytest + pytest-asyncio | 46 tests, all modes incl. Ollama-fallback paths |
+| Tests | pytest + pytest-asyncio | 50 tests, all modes incl. Ollama-fallback paths |
 
 ## Core architecture: two-tier guarantee
 
 The single idea that makes "max savings + 100% accuracy" possible:
 
-```
-content ──compress──► compressed view  (lossy, small)   ← what the LLM reads
-   │
-   └────store(hash)──► original         (lossless)       ← sarup_retrieve(hash)
+```mermaid
+flowchart LR
+    IN["📥 content"] --> C{"compress"}:::engine
+    C -- "lossy · small" --> V["📄 compressed view<br/>what the LLM reads"]:::lossy
+    C -. "store(hash)" .-> O[("🗄️ original<br/>lossless")]:::lossless
+    V -. "sarup_retrieve(hash)" .-> O
+    O == "byte-for-byte ✓" ==> V
+
+    classDef engine fill:#fde68a,stroke:#d97706,color:#111
+    classDef lossy fill:#fef3c7,stroke:#f59e0b,color:#111
+    classDef lossless fill:#bbf7d0,stroke:#16a34a,color:#111
 ```
 
 Lossy compression is *safe* because the original is always one hash lookup away.
