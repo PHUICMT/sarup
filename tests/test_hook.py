@@ -65,6 +65,18 @@ def test_large_prose_is_compressed_and_recoverable(monkeypatch, tmp_path):
     assert other_process_store.retrieve(h) == BIG_THAI  # byte-for-byte
 
 
+def test_hook_output_is_ascii_safe(monkeypatch, tmp_path):
+    """Regression: hook stdout must be pure ASCII so a cp1252 console (Windows)
+    can't crash it on Thai output. main() writes json.dumps(out) (ensure_ascii)."""
+    monkeypatch.setenv("SARUP_DB_PATH", str(tmp_path / "c.db"))
+    monkeypatch.setattr(sarup_hook, "MIN_CHARS", 100)
+    out = sarup_hook.build_hook_output(
+        {"tool_name": "Bash", "tool_input": {}, "tool_output": BIG_THAI}
+    )
+    assert out is not None
+    json.dumps(out).encode("ascii")  # raises if any non-ASCII leaks to stdout
+
+
 def test_no_db_path_skips_substitution(monkeypatch):
     """Without a shared store, the original is unrecoverable → never substitute."""
     monkeypatch.delenv("SARUP_DB_PATH", raising=False)

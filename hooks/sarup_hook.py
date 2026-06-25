@@ -20,6 +20,13 @@ import json
 import os
 import sys
 
+# On Windows the hook's stdout is a cp1252 pipe; writing Thai directly would
+# raise UnicodeEncodeError and crash the hook (silently dropping compression).
+try:
+    sys.stdout.reconfigure(encoding="utf-8")
+except Exception:
+    pass
+
 # Extensions whose content must never be line-dropped.
 _CODE_EXTS = {
     ".py", ".js", ".ts", ".tsx", ".jsx", ".rs", ".go", ".java", ".c", ".h",
@@ -101,7 +108,12 @@ def main() -> None:
         sys.exit(0)  # any failure → never break the user's tool result
 
     if out is not None:
-        sys.stdout.write(json.dumps(out, ensure_ascii=False))
+        try:
+            # ensure_ascii=True keeps stdout pure ASCII (Thai → \uXXXX), so it
+            # never trips a non-UTF-8 console; Claude Code decodes it back.
+            sys.stdout.write(json.dumps(out))
+        except Exception:
+            pass  # writing failed → leave tool output untouched, never crash
     sys.exit(0)
 
 
