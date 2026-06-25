@@ -23,6 +23,37 @@ original round-trips byte-for-byte. If the model ever needs full detail it calls
 `sarup_retrieve(hash)`. **You can never permanently lose information** — that's
 how aggressive compression and 100% accuracy coexist.
 
+## How it works (flow)
+
+**Manual** — the model calls the tools explicitly:
+
+```
+large content ──► sarup_compress ──► { compressed, hash, verified:true }
+                                         │
+                  model works on the compressed view (cheap)
+                                         │
+                  need full detail? ──► sarup_retrieve(hash) ──► original (byte-for-byte)
+```
+
+**Automatic** — install the PostToolUse hook and the model does nothing special:
+
+```
+Read / Bash / Grep returns a large output
+        │
+        ▼
+  PostToolUse hook intercepts
+        ├─ caches the ORIGINAL into SARUP_DB_PATH   (lossless)
+        └─ substitutes a COMPRESSED view + hash into context   (cheap)
+        │
+        ▼
+  model sees the compressed output automatically
+        │
+  need full detail? ──► sarup_retrieve(hash) ──► original (byte-for-byte)
+```
+
+Source-code reads are skipped by the hook; small outputs pass through unchanged.
+Either way, **nothing is ever permanently lost** — the original is one hash away.
+
 ## Tools
 
 | Tool | Purpose |
