@@ -82,6 +82,13 @@ ollama pull gemma3:12b           # abstractive (Thai-validated base)
 .\.venv\Scripts\python.exe -m pytest tests/ -q
 ```
 
+## Auto-compression (no manual tool calls)
+
+Instead of asking the model to call `sarup_compress`, install the **PostToolUse
+hook** — it transparently compresses large `Read`/`Bash`/`Grep` outputs before
+they enter context, caches the original, and leaves a `sarup_retrieve` hash.
+Source-code reads are skipped for safety. See [hooks/README.md](hooks/README.md).
+
 ## Configuration (env vars)
 
 | Var | Default | Meaning |
