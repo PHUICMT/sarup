@@ -7,7 +7,7 @@ import re
 from dataclasses import dataclass, field
 
 from .thai import is_thai, tfidf_compress, PYTHAINLP_AVAILABLE
-from .tokens import count_tokens, token_method  # noqa: F401  (re-exported)
+from .tokens import count_tokens
 from .llm import generate as _llm_generate, ABSTRACTIVE_MODEL
 from .semantic import semantic_compress
 
@@ -45,6 +45,28 @@ class CompressionResult:
     savings_percent: float
     transforms: list[str] = field(default_factory=list)
     lossy: bool = True
+
+
+# Minimum savings (%) for each route to be worth returning over the original.
+_MIN_JSON_SAVINGS = 3
+_MIN_LOG_SAVINGS = 10
+_MIN_PROSE_SAVINGS = 5
+
+
+def _result(original_tokens: int, out: str, transforms: list[str], lossy: bool) -> CompressionResult:
+    """Build a CompressionResult, computing token savings from `out`."""
+    ct = estimate_tokens(out)
+    saved = max(0, original_tokens - ct)
+    pct = round(saved / original_tokens * 100, 1) if original_tokens else 0.0
+    return CompressionResult(
+        compressed=out,
+        original_tokens=original_tokens,
+        compressed_tokens=ct,
+        tokens_saved=saved,
+        savings_percent=pct,
+        transforms=transforms,
+        lossy=lossy,
+    )
 
 
 # ─── Content detection ────────────────────────────────────────────────────────
@@ -311,67 +333,33 @@ def compress(
             out, transforms = _compress_json(stripped)
         else:
             out, transforms = _normalize_whitespace(content)
-        ct = estimate_tokens(out)
-        saved = max(0, original_tokens - ct)
-        pct = round(saved / original_tokens * 100, 1) if original_tokens else 0.0
-        return CompressionResult(
-            compressed=out,
-            original_tokens=original_tokens,
-            compressed_tokens=ct,
-            tokens_saved=saved,
-            savings_percent=pct,
-            transforms=transforms,
-            lossy=False,
-        )
+        return _result(original_tokens, out, transforms, lossy=False)
 
     # ── JSON ───────────────────────────────────────────────────────────────
     if _looks_like_json(stripped):
         out, transforms = _compress_json(stripped)
         if out != stripped:
-            ct = estimate_tokens(out)
-            saved = max(0, original_tokens - ct)
-            pct = round(saved / original_tokens * 100, 1) if original_tokens else 0.0
-            if pct >= 3:  # only return if actually saved something
-                return CompressionResult(
-                    compressed=out,
-                    original_tokens=original_tokens,
-                    compressed_tokens=ct,
-                    tokens_saved=saved,
-                    savings_percent=pct,
-                    transforms=transforms,
-                    lossy=False,
-                )
+            res = _result(original_tokens, out, transforms, lossy=False)
+            if res.savings_percent >= _MIN_JSON_SAVINGS:
+                return res
 
     # ── Logs ───────────────────────────────────────────────────────────────
     if _looks_like_logs(content):
         out, transforms = _compress_logs(content, target_ratio)
-        ct = estimate_tokens(out)
-        saved = max(0, original_tokens - ct)
-        pct = round(saved / original_tokens * 100, 1) if original_tokens else 0.0
-        if pct >= 10:
-            return CompressionResult(
-                compressed=out,
-                original_tokens=original_tokens,
-                compressed_tokens=ct,
-                tokens_saved=saved,
-                savings_percent=pct,
-                transforms=transforms,
-                lossy=True,
-            )
+        res = _result(original_tokens, out, transforms, lossy=True)
+        if res.savings_percent >= _MIN_LOG_SAVINGS:
+            return res
 
-    # ── Mixed prose + code fences ─────────────────────────────────────────
+    # ── Mixed prose + code fences, or pure prose ───────────────────────────
     if _has_code_fences(content):
         out, transforms = _compress_mixed(content, target_ratio, query=query, mode=mode)
     else:
-        # ── Pure prose (Thai or English) ─────────────────────────────────
         out, transforms = _compress_prose(content, target_ratio, query=query, mode=mode)
 
-    ct = estimate_tokens(out)
-    saved = max(0, original_tokens - ct)
-    pct = round(saved / original_tokens * 100, 1) if original_tokens else 0.0
+    res = _result(original_tokens, out, transforms, lossy=True)
 
-    # If compression provided no benefit, return original unchanged
-    if pct < 5 or out == content:
+    # If compression provided no real benefit, return the original unchanged.
+    if res.savings_percent < _MIN_PROSE_SAVINGS or out == content:
         return CompressionResult(
             compressed=content,
             original_tokens=original_tokens,
@@ -381,13 +369,4 @@ def compress(
             transforms=["noop"],
             lossy=False,
         )
-
-    return CompressionResult(
-        compressed=out,
-        original_tokens=original_tokens,
-        compressed_tokens=ct,
-        tokens_saved=saved,
-        savings_percent=pct,
-        transforms=transforms,
-        lossy=True,
-    )
+    return res

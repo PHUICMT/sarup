@@ -205,6 +205,22 @@ Source-code reads are skipped for safety. Full setup in **[hooks/README.md](hook
 }
 ```
 
+## Privacy & data
+
+To guarantee recovery, Sarup caches the **original** content in the store. Two
+things to know:
+
+- With `SARUP_DB_PATH` set, originals are written to that **SQLite file in
+  plaintext** (no encryption). Treat it like a cache of whatever you compressed.
+- If you compress tool outputs that contain secrets (e.g. a `.env` dump or
+  credentials in a log), those land in the cache too. The auto-hook skips
+  source-code/config file reads, but `Bash` output is fair game — review what
+  you point it at.
+
+`*.db` is git-ignored, so the cache never gets committed. For zero on-disk
+footprint, leave `SARUP_DB_PATH` unset (memory-only; the MCP server then loses
+the cache on restart, and the hook will not substitute — see the hook docs).
+
 ## Configuration
 
 | Var | Default | Meaning |
