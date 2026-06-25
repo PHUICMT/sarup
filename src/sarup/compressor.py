@@ -15,9 +15,12 @@ from .semantic import semantic_compress
 # Compression modes for the prose path.
 MODE_EXTRACTIVE = "extractive"   # TF-IDF, deterministic, offline (default)
 MODE_SEMANTIC = "semantic"       # embedding centrality + cosine dedup (ollama)
-MODE_ABSTRACTIVE = "abstractive"  # local LLM rewrite (ollama, highest ratio)
-MODE_AUTO = "auto"               # abstractive if ollama up, else extractive
-VALID_MODES = {MODE_EXTRACTIVE, MODE_SEMANTIC, MODE_ABSTRACTIVE, MODE_AUTO}
+MODE_ABSTRACTIVE = "abstractive"  # local LLM rewrite (ollama)
+MODE_PIPELINE = "pipeline"       # cascade semantic -> abstractive for max savings
+MODE_AUTO = "auto"               # semantic if ollama up, else extractive
+VALID_MODES = {
+    MODE_EXTRACTIVE, MODE_SEMANTIC, MODE_ABSTRACTIVE, MODE_PIPELINE, MODE_AUTO
+}
 
 
 # ─── Token estimation ─────────────────────────────────────────────────────────
@@ -172,38 +175,22 @@ def _compress_abstractive(text: str, target_ratio: float) -> tuple[str, list[str
     return out, ["abstractive_llm", f"model:{ABSTRACTIVE_MODEL}"]
 
 
-def _compress_prose(
-    text: str,
-    target_ratio: float,
-    query: str = "",
-    mode: str = MODE_EXTRACTIVE,
-) -> tuple[str, list[str]]:
-    """Compress Thai/English prose using the selected mode, with safe fallback.
+def _semantic_try(text: str, target_ratio: float, query: str) -> tuple[str, list[str]] | None:
+    """Semantic extractive (embeddings). None if unavailable/unhelpful."""
+    sem = semantic_compress(text, target_ratio=target_ratio, query=query)
+    if sem is None or sem == text:
+        return None
+    transforms = ["semantic_extractive", "embeddings"]
+    if is_thai(text):
+        transforms.append("thai")
+    return sem, transforms
 
-    abstractive → semantic → extractive, each degrading to the next when the
-    Ollama backend is unavailable. Extractive is always available (offline).
-    """
-    # Abstractive (LLM rewrite) — highest ratio, lossy view (recoverable via store).
-    if mode in (MODE_ABSTRACTIVE, MODE_AUTO):
-        abs_result = _compress_abstractive(text, target_ratio)
-        if abs_result is not None:
-            return abs_result
-        # auto silently falls through to extractive; explicit abstractive too.
 
-    # Semantic (embedding centrality + cosine dedup) — verbatim subset.
-    if mode == MODE_SEMANTIC:
-        sem = semantic_compress(text, target_ratio=target_ratio, query=query)
-        if sem is not None and sem != text:
-            transforms = ["semantic_extractive", "embeddings"]
-            if is_thai(text):
-                transforms.append("thai")
-            return sem, transforms
-
-    # Extractive (TF-IDF) — deterministic, offline, default.
+def _extractive(text: str, target_ratio: float, query: str) -> tuple[str, list[str]]:
+    """TF-IDF extractive — deterministic, offline. Always available."""
     result = tfidf_compress(text, target_ratio=target_ratio, query=query)
     if result == text:
         return text, ["noop"]
-
     transforms = []
     if is_thai(text):
         transforms.append("thai_extractive")
@@ -213,6 +200,65 @@ def _compress_prose(
         transforms.append("en_extractive")
     transforms.append("tfidf_scoring")
     return result, transforms
+
+
+def _compress_pipeline(text: str, target_ratio: float, query: str) -> tuple[str, list[str]]:
+    """Cascade stages for maximum reduction; each stage feeds the next.
+
+    1. Sentence selection (semantic if Ollama up, else TF-IDF) keeps the most
+       representative content.
+    2. Abstractive rewrite (if Ollama up) further tightens the survivors.
+
+    Every stage is recoverable end-to-end because the *original* is cached in the
+    store before any compression — the pipeline only shrinks the working view.
+    """
+    transforms: list[str] = []
+
+    # Stage 1 — selection.
+    stage1 = _semantic_try(text, target_ratio, query) or _extractive(text, target_ratio, query)
+    current, t1 = stage1
+    if t1 != ["noop"]:
+        transforms.extend(t1)
+
+    # Stage 2 — abstractive rewrite of what survived.
+    ab = _compress_abstractive(current, target_ratio)
+    if ab is not None:
+        current, t2 = ab
+        transforms.extend(t2)
+
+    if not transforms:
+        return text, ["noop"]
+    return current, ["pipeline", *transforms]
+
+
+def _compress_prose(
+    text: str,
+    target_ratio: float,
+    query: str = "",
+    mode: str = MODE_EXTRACTIVE,
+) -> tuple[str, list[str]]:
+    """Compress Thai/English prose using the selected mode, with safe fallback.
+
+    Every Ollama-backed mode degrades to TF-IDF extractive when the backend is
+    unavailable, so compression always works offline.
+    """
+    if mode == MODE_PIPELINE:
+        return _compress_pipeline(text, target_ratio, query)
+
+    # auto / semantic → prefer embeddings, fall through to extractive.
+    if mode in (MODE_AUTO, MODE_SEMANTIC):
+        sem = _semantic_try(text, target_ratio, query)
+        if sem is not None:
+            return sem
+        # Ollama down → extractive below.
+
+    # Explicit abstractive (LLM rewrite); falls through if backend is down.
+    if mode == MODE_ABSTRACTIVE:
+        ab = _compress_abstractive(text, target_ratio)
+        if ab is not None:
+            return ab
+
+    return _extractive(text, target_ratio, query)
 
 
 # ─── Whitespace normalization (lossless) ─────────────────────────────────────

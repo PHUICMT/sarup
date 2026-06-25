@@ -85,13 +85,15 @@ class SarupServer:
                             },
                             "mode": {
                                 "type": "string",
-                                "enum": ["extractive", "semantic", "abstractive", "auto"],
+                                "enum": ["extractive", "semantic", "abstractive", "pipeline", "auto"],
                                 "description": (
                                     "Prose strategy. 'extractive' (default): offline TF-IDF, "
-                                    "verbatim subset. 'semantic': embedding centrality (needs Ollama). "
-                                    "'abstractive': local-LLM rewrite, highest savings (needs Ollama). "
-                                    "'auto': abstractive if Ollama is up, else extractive. "
-                                    "All modes stay 100% recoverable via sarup_retrieve."
+                                    "verbatim subset, ~1ms. 'semantic': embedding centrality, "
+                                    "best ratio (needs Ollama). 'abstractive': local-LLM rewrite "
+                                    "(needs Ollama, slow). 'pipeline': cascade semantic -> "
+                                    "abstractive for maximum savings. 'auto': semantic if Ollama "
+                                    "is up, else extractive. All modes stay 100% recoverable via "
+                                    "sarup_retrieve."
                                 ),
                                 "default": "extractive",
                             },

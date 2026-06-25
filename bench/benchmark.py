@@ -136,7 +136,7 @@ def _mode_comparison() -> None:
     print(header)
     print("─" * len(header))
 
-    for mode in ("extractive", "semantic", "abstractive"):
+    for mode in ("extractive", "semantic", "abstractive", "pipeline", "auto"):
         t0 = time.perf_counter()
         r = compress(THAI_PROSE, target_ratio=0.5, mode=mode)
         elapsed = (time.perf_counter() - t0) * 1000

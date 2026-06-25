@@ -29,7 +29,8 @@ _CODE_EXTS = {
 }
 
 MIN_CHARS = int(os.environ.get("SARUP_HOOK_MIN_CHARS", "4000"))
-HOOK_MODE = os.environ.get("SARUP_HOOK_MODE", "extractive")
+# 'auto' = semantic when Ollama is up (best ratio), else extractive offline.
+HOOK_MODE = os.environ.get("SARUP_HOOK_MODE", "auto")
 
 
 def _is_code_read(tool_name: str, tool_input: dict) -> bool:

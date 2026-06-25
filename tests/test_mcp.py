@@ -187,7 +187,7 @@ def test_ollama_available_returns_bool_without_crashing():
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("mode", ["extractive", "semantic", "abstractive", "auto"])
+@pytest.mark.parametrize("mode", ["extractive", "semantic", "abstractive", "pipeline", "auto"])
 async def test_all_modes_compress_and_stay_recoverable(server, mode):
     """Every mode must produce valid output AND keep the original 100% recoverable,
     regardless of whether the Ollama backend is present."""
