@@ -49,11 +49,22 @@ Every compress call runs `store.verify(hash, original)` and reports
 - **Cosine dedup** — catches paraphrased repetition that n-grams miss.
 - Output is still a **verbatim subset** — ranks by *meaning*, not word overlap.
 
-### 3. Abstractive (Ollama, highest potential, slowest)
+### 3. Abstractive (Ollama, slow)
 - **Local-LLM rewrite** with a strict "preserve all facts, add nothing" prompt
   (Thai or English variant chosen by content).
 - `<think>` blocks from reasoning models are stripped.
 - Accepted only if it genuinely reduces tokens; otherwise falls back.
+
+### 4. Pipeline (Ollama, maximum savings)
+- **Cascade**: stage 1 selects the most representative sentences (semantic, or
+  TF-IDF if embeddings are down); stage 2 abstractively rewrites the survivors.
+- Each stage feeds the next → ~88% on Thai prose (522→62 tokens measured).
+- Lossy view, but still fully recoverable: the original is cached before any
+  stage runs.
+
+### auto
+- Prefers **semantic** when Ollama is up (best ratio for the speed), else
+  **extractive** offline. The sensible everyday default for the hook.
 
 ### Content routing (before mode applies)
 | Detected | Handling | Lossless? |
@@ -74,6 +85,7 @@ offline; Ollama only raises the ceiling.
   (`unknown test 'tool_calls'`) — unusable until repackaged.
 - **Qwen3** tends to "overthink" (slower, conservative compression) — matches
   SCB10X's own published observation.
-- **Gemma 3 12B** is the validated balance for Thai → chosen default.
-- For everyday use, **semantic mode beats abstractive**: higher ratio, ~10× faster,
-  and verbatim (safer).
+- **Gemma 3 12B** is the validated balance for Thai → chosen default (gemma4
+  variants compressed *less* — 30–36% vs gemma3's 51% — in our bakeoff).
+- For everyday use, **semantic mode beats abstractive**: higher ratio, ~4× faster,
+  and verbatim (safer). For maximum reduction, **pipeline** cascades both (~88%).

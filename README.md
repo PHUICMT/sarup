@@ -67,9 +67,10 @@ Either path, **nothing is ever permanently lost** — the original is one hash a
 | Mode | How | Needs Ollama | Notes |
 |------|-----|:---:|-------|
 | `extractive` *(default)* | TF-IDF sentence scoring + n-gram dedup | no | Deterministic, offline, ~1ms, verbatim subset |
-| `semantic` | Embedding centrality + cosine dedup | yes | **Best ratio** (~65%), ~1s, verbatim subset |
-| `abstractive` | Local-LLM rewrite | yes | Highest potential ratio, slow (~10–20s), paraphrased |
-| `auto` | abstractive if Ollama is up, else extractive | optional | — |
+| `semantic` | Embedding centrality + cosine dedup | yes | ~65%, ~1–2s, verbatim subset |
+| `abstractive` | Local-LLM rewrite | yes | ~50%, slow (~8–20s), paraphrased |
+| `pipeline` | Cascade: semantic → abstractive | yes | **Max savings (~88%)**, ~2s, paraphrased |
+| `auto` | semantic if Ollama is up, else extractive | optional | Sensible high-ratio default |
 
 All modes stay 100% recoverable via the store. Ollama modes **degrade
 gracefully** to extractive when the backend is down.
@@ -87,7 +88,9 @@ JSON (lossless)                 67      44    34.3%       OK
 Logs                           563     300    46.7%       OK
 TOTAL                         1779     872    51.0%    ALL OK   → 100% recoverable
 
-Mode comparison (Thai prose):  extractive 50.8% / semantic 64.6% / abstractive 27.4%
+Mode comparison (Thai prose, 522 tok):
+  extractive 50.8% (1ms) · auto 64.6% (~90ms) · semantic 64.6% (2.1s)
+  abstractive 51.1% (8s) · pipeline 88.1% (2.3s)   ← all verified recoverable
 ```
 
 (Token counts via tiktoken `cl100k_base` — a real tokenizer, not a byte guess.)
