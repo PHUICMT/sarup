@@ -20,6 +20,10 @@ from typing import Optional
 from .llm import embed
 from .thai import split_sentences
 
+# Centrality + dedup are O(N²) in sentence count. Above this, fall back to the
+# linear TF-IDF path instead of pinning CPU/RAM on a pathological input.
+MAX_SENTENCES = 400
+
 
 def _cosine(a: list[float], b: list[float]) -> float:
     dot = sum(x * y for x, y in zip(a, b))
@@ -43,8 +47,8 @@ def semantic_compress(
     (caller should fall back to TF-IDF).
     """
     sentences = split_sentences(text)
-    if len(sentences) < 4:
-        return None
+    if len(sentences) < 4 or len(sentences) > MAX_SENTENCES:
+        return None  # too short to help, or too large for the O(N²) passes
 
     inputs = list(sentences)
     if query:

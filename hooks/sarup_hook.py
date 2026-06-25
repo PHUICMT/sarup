@@ -56,6 +56,13 @@ def build_hook_output(payload: dict) -> dict | None:
     if _is_code_read(tool_name, tool_input):
         return None
 
+    # Without a shared on-disk store, the MCP server (a different process) could
+    # never recover the original — so the retrieval hash we'd advertise would be
+    # a broken promise. Refuse to substitute rather than lose data silently.
+    db_path = os.environ.get("SARUP_DB_PATH")
+    if not db_path:
+        return None
+
     # Imported lazily so an import error never breaks the user's tool result.
     from sarup.compressor import compress
     from sarup.store import CompressionStore
@@ -65,7 +72,7 @@ def build_hook_output(payload: dict) -> dict | None:
         return None
 
     # Cache original in the SHARED store so sarup_retrieve can recover it.
-    store = CompressionStore(db_path=os.environ.get("SARUP_DB_PATH"))
+    store = CompressionStore(db_path=db_path)
     h = store.store(output, result.compressed, result.original_tokens, result.compressed_tokens)
 
     footer = (

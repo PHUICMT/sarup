@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import math
 import re
-from typing import Optional
 
 try:
     from pythainlp.tokenize import word_tokenize as _th_word_tokenize

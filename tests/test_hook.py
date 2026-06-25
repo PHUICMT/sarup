@@ -63,3 +63,11 @@ def test_large_prose_is_compressed_and_recoverable(monkeypatch, tmp_path):
     h = updated.split("hash '")[1].split("'")[0]
     other_process_store = CompressionStore(db_path=str(db))
     assert other_process_store.retrieve(h) == BIG_THAI  # byte-for-byte
+
+
+def test_no_db_path_skips_substitution(monkeypatch):
+    """Without a shared store, the original is unrecoverable → never substitute."""
+    monkeypatch.delenv("SARUP_DB_PATH", raising=False)
+    monkeypatch.setattr(sarup_hook, "MIN_CHARS", 100)
+    payload = {"tool_name": "Bash", "tool_input": {}, "tool_output": BIG_THAI}
+    assert sarup_hook.build_hook_output(payload) is None

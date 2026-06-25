@@ -5,7 +5,6 @@ from __future__ import annotations
 import json
 import re
 from dataclasses import dataclass, field
-from typing import Optional
 
 from .thai import is_thai, tfidf_compress, PYTHAINLP_AVAILABLE
 from .tokens import count_tokens, token_method  # noqa: F401  (re-exported)
@@ -93,18 +92,21 @@ def _compress_logs(text: str, target_ratio: float) -> tuple[str, list[str]]:
     if len(lines) < 6:
         return text, []
 
+    # Total occurrences per prefix, so the "omitted" count is the real number.
+    totals: dict[str, int] = {}
+    for ln in lines:
+        totals[ln[:60]] = totals.get(ln[:60], 0) + 1
+
     seen: dict[str, int] = {}
     deduped: list[str] = []
     for ln in lines:
         # Key on first 60 chars (ignores trailing variable data like timestamps)
         key = ln[:60]
-        if key not in seen:
-            seen[key] = 0
-        seen[key] += 1
+        seen[key] = seen.get(key, 0) + 1
         if seen[key] <= 2:  # keep first two occurrences
             deduped.append(ln)
-        elif seen[key] == 3:
-            deduped.append(f"  ... ({seen[key]-2} similar lines omitted) ...")
+        elif seen[key] == 3 and totals[key] > 2:
+            deduped.append(f"  ... ({totals[key] - 2} similar lines omitted) ...")
 
     k = max(4, round(len(deduped) * target_ratio))
     result = deduped[:k]

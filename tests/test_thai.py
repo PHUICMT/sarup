@@ -183,6 +183,17 @@ def test_mixed_has_code_preserved_transform():
     assert "code_preserved" in result.transforms
 
 
+# ─── Log compression ──────────────────────────────────────────────────────────
+
+def test_log_omitted_count_is_accurate():
+    """Repeated log lines report the true number omitted, not a constant 1."""
+    from sarup.compressor import _compress_logs
+    lines = ["2026-06-25 INFO connection reset by peer"] * 10 + ["2026-06-25 INFO done"]
+    out, transforms = _compress_logs("\n".join(lines), target_ratio=0.9)
+    assert "8 similar lines omitted" in out  # 10 occurrences - 2 kept = 8
+    assert "log_dedup" in transforms
+
+
 # ─── JSON compression ─────────────────────────────────────────────────────────
 
 def test_json_compact():

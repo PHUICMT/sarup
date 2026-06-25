@@ -61,7 +61,7 @@ class CompressionStore:
             compressed=compressed,
             original_tokens=original_tokens,
             compressed_tokens=compressed_tokens,
-            created_at=time.monotonic(),
+            created_at=time.time(),  # wall-clock, consistent with the SQLite row
         )
         self._memory[h] = entry
 
