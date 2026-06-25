@@ -25,34 +25,34 @@ how aggressive compression and 100% accuracy coexist.
 
 ## How it works (flow)
 
-**Manual** — the model calls the tools explicitly:
+Two entry points feed one two-tier engine: a cheap **compressed view** the model
+reads, and a lossless **retrieval store** that can restore the original byte-for-byte.
 
-```
-large content ──► sarup_compress ──► { compressed, hash, verified:true }
-                                         │
-                  model works on the compressed view (cheap)
-                                         │
-                  need full detail? ──► sarup_retrieve(hash) ──► original (byte-for-byte)
-```
+```mermaid
+flowchart TD
+    M["🧑 Manual<br/>sarup_compress()"]:::entry --> R
+    A["⚙️ Automatic<br/>PostToolUse hook<br/>(Read · Bash · Grep)"]:::entry --> R
 
-**Automatic** — install the PostToolUse hook and the model does nothing special:
+    R{"Sarup compress<br/>extractive · semantic · abstractive"}:::engine
+    R -- "compressed view<br/>~50–65% fewer tokens" --> V["📄 Model context"]:::lossy
+    R -. "cache original" .-> S[("🗄️ Retrieval store<br/>hash → original")]:::lossless
 
-```
-Read / Bash / Grep returns a large output
-        │
-        ▼
-  PostToolUse hook intercepts
-        ├─ caches the ORIGINAL into SARUP_DB_PATH   (lossless)
-        └─ substitutes a COMPRESSED view + hash into context   (cheap)
-        │
-        ▼
-  model sees the compressed output automatically
-        │
-  need full detail? ──► sarup_retrieve(hash) ──► original (byte-for-byte)
+    V -. "need full detail?" .-> RET["🔑 sarup_retrieve(hash)"]:::lossless
+    RET --> S
+    S == "byte-for-byte ✓" ==> V
+
+    classDef entry fill:#e0e7ff,stroke:#6366f1,color:#111
+    classDef engine fill:#fde68a,stroke:#d97706,color:#111
+    classDef lossy fill:#fef3c7,stroke:#f59e0b,color:#111
+    classDef lossless fill:#bbf7d0,stroke:#16a34a,color:#111
 ```
 
-Source-code reads are skipped by the hook; small outputs pass through unchanged.
-Either way, **nothing is ever permanently lost** — the original is one hash away.
+- **Manual** — the model calls `sarup_compress` / `sarup_retrieve` itself.
+- **Automatic** — the hook intercepts large tool outputs, caches the original to
+  `SARUP_DB_PATH`, and substitutes the compressed view + a retrieval hash. Source
+  code is skipped; small outputs pass through untouched.
+
+Either path, **nothing is ever permanently lost** — the original is one hash away.
 
 ## Tools
 
