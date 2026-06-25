@@ -153,7 +153,20 @@ ollama pull gemma3:12b           # rewrite → abstractive / pipeline (Thai-vali
 
 ## Register with Claude Code
 
-Add to your MCP config (e.g. `.mcp.json` or `~/.claude.json`):
+**One-command setup (recommended).** Detects this machine's paths, probes Ollama
+(picks the best mode + models), and merges into `.mcp.json` / `.claude/settings.json`
+**without clobbering** anything already there (a `.bak` is written first):
+
+```powershell
+.\.venv\Scripts\python.exe scripts\install.py --with-hook --pull
+```
+
+- No Ollama? It configures offline `extractive` mode — still fully works.
+- Ollama up? It auto-selects `nomic-embed-text` (semantic) + `gemma3:12b` (rewrite)
+  and sets the hook to `auto`. `--pull` fetches any missing models.
+- Idempotent — safe to re-run; `--global` writes to `~/.claude` instead.
+
+**Manual** — or add it yourself to your MCP config (e.g. `.mcp.json` or `~/.claude.json`):
 
 ```json
 {

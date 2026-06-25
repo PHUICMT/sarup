@@ -15,6 +15,11 @@ venv/
 *.sqlite
 *.sqlite3
 
+# Machine-specific local config (absolute paths) — templates live in README
+.mcp.json
+.claude/
+*.bak.*
+
 # Test / tooling caches
 .pytest_cache/
 .ruff_cache/
