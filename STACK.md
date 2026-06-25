@@ -1,0 +1,79 @@
+# Stack & Techniques
+
+What Sarup is built from, and the technique behind each part.
+
+## Tech stack
+
+| Layer | Choice | Why |
+|-------|--------|-----|
+| Language | Python 3.11+ | PyThaiNLP ecosystem; MCP SDK |
+| Protocol | [MCP](https://modelcontextprotocol.io) (`mcp>=1.9`, stdio) | Native Claude Code tool integration |
+| Thai NLP | [PyThaiNLP](https://pythainlp.org) `newmm` | Word segmentation — Thai has no spaces between words |
+| Token counting | [tiktoken](https://github.com/openai/tiktoken) `cl100k_base` | Real tokenizer (offline) → verifiable savings, not byte guesses |
+| Local LLM (optional) | [Ollama](https://ollama.com) via stdlib `urllib` | Embeddings + abstractive rewrite, fully offline, no extra dep |
+| Embeddings | `nomic-embed-text` | Semantic sentence scoring & dedup |
+| Abstractive model | `gemma3:12b` (default) | SCB10X-validated Thai base; configurable |
+| Storage | in-memory dict + optional SQLite | CCR (compress-and-cache-retrieval) original store |
+| Hash | SHA-256, first 24 hex chars | Deterministic, stable content key |
+| Build | hatchling | Simple PEP 621 packaging |
+| Tests | pytest + pytest-asyncio | 46 tests, all modes incl. Ollama-fallback paths |
+
+## Core architecture: two-tier guarantee
+
+The single idea that makes "max savings + 100% accuracy" possible:
+
+```
+content ──compress──► compressed view  (lossy, small)   ← what the LLM reads
+   │
+   └────store(hash)──► original         (lossless)       ← sarup_retrieve(hash)
+```
+
+Lossy compression is *safe* because the original is always one hash lookup away.
+Every compress call runs `store.verify(hash, original)` and reports
+`verified: true` — the guarantee is proven per call, not assumed.
+
+## Techniques per compression mode
+
+### 1. Extractive (default, offline, deterministic)
+- **Word tokenization** via PyThaiNLP `newmm` (Thai) / whitespace (English).
+- **TF-IDF sentence scoring** — rank sentences by term importance.
+- **Query boost** (×2.5) — sentences matching an optional `query` score higher.
+- **Position bias** — first/last sentences kept (framing).
+- **n-gram (2-gram) Jaccard dedup** — drop near-duplicate sentences.
+- Output is a **verbatim subset** of input sentences (no paraphrase).
+
+### 2. Semantic (Ollama, best ratio)
+- **Sentence embeddings** (`nomic-embed-text`).
+- **Centrality scoring** — each sentence ranked by mean cosine similarity to all
+  others (most representative kept).
+- **Cosine dedup** — catches paraphrased repetition that n-grams miss.
+- Output is still a **verbatim subset** — ranks by *meaning*, not word overlap.
+
+### 3. Abstractive (Ollama, highest potential, slowest)
+- **Local-LLM rewrite** with a strict "preserve all facts, add nothing" prompt
+  (Thai or English variant chosen by content).
+- `<think>` blocks from reasoning models are stripped.
+- Accepted only if it genuinely reduces tokens; otherwise falls back.
+
+### Content routing (before mode applies)
+| Detected | Handling | Lossless? |
+|----------|----------|:---:|
+| JSON | compact (strip insignificant whitespace) | ✅ |
+| Logs | dedup repeated lines + head-truncate | ❌ |
+| Prose + code fences | compress prose, **preserve code verbatim** | code: ✅ |
+| Pure prose | selected mode | subset / paraphrase |
+
+## Graceful degradation
+`abstractive → semantic → extractive`. If Ollama is down or a model is missing,
+Sarup silently falls back to the deterministic offline path. It always works
+offline; Ollama only raises the ceiling.
+
+## Notes from model evaluation (June 2026)
+- **Typhoon 2.1** (SCB10X, Thai-tuned) is the strongest Thai base in principle,
+  but its current GGUF chat template crashes `llama-server` in recent Ollama
+  (`unknown test 'tool_calls'`) — unusable until repackaged.
+- **Qwen3** tends to "overthink" (slower, conservative compression) — matches
+  SCB10X's own published observation.
+- **Gemma 3 12B** is the validated balance for Thai → chosen default.
+- For everyday use, **semantic mode beats abstractive**: higher ratio, ~10× faster,
+  and verbatim (safer).
