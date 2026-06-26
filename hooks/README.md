@@ -6,6 +6,14 @@ Compress large tool outputs **automatically** — no need for the model to call
 (`updatedToolOutput`), and caches the original so `sarup_retrieve(hash)` still
 recovers it byte-for-byte.
 
+> **⚠️ Status (June 2026): experimental — pending Claude Code support.**
+> The hook is invoked correctly and emits a valid `updatedToolOutput`, but
+> Claude Code **2.1.167 and 2.1.193 do not apply it** — the model still receives
+> the full tool result (verified live). The [hooks docs](https://code.claude.com/docs/en/hooks)
+> say `updatedToolOutput` replaces the result, so this should start working on a
+> build that honors it. **Until then, use the manual `sarup_compress` tool**
+> (fully working). This hook is ready for the day Claude Code applies the field.
+
 ## How it stays 100% accurate
 
 The hook caches the original into the **same store** the MCP server reads from

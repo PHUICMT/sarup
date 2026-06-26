@@ -192,6 +192,10 @@ Skip manual tool calls entirely: install the **PostToolUse hook** and large `Rea
 outputs are compressed before they enter context, with the original cached for retrieval.
 Source-code reads are skipped for safety. Full setup in **[hooks/README.md](hooks/README.md)**.
 
+> **Experimental:** the hook emits a valid `updatedToolOutput`, but current Claude Code builds
+> (2.1.167 / 2.1.193) don't yet apply it, so it's a no-op in-session today. Use the manual
+> `sarup_compress` tool meanwhile — the hook is ready for when Claude Code honors the field.
+
 ```json
 {
   "hooks": {
