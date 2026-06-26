@@ -51,15 +51,21 @@ def _routing_on() -> bool:
     return os.environ.get("ANTHROPIC_BASE_URL", "") == _base_url()
 
 
-def _toggle_routing(icon, item) -> None:
-    if _routing_on():
-        subprocess.run(["reg", "delete", "HKCU\\Environment", "/v", "ANTHROPIC_BASE_URL", "/f"],
-                       capture_output=True)
-        os.environ.pop("ANTHROPIC_BASE_URL", None)
-    else:
+def _set_routing(on: bool) -> None:
+    if on:
         subprocess.run(["setx", "ANTHROPIC_BASE_URL", _base_url()], capture_output=True)
         os.environ["ANTHROPIC_BASE_URL"] = _base_url()
+    else:
+        # Only clear OUR value, never someone else's custom base URL.
+        if os.environ.get("ANTHROPIC_BASE_URL", "") == _base_url():
+            subprocess.run(["reg", "delete", "HKCU\\Environment", "/v", "ANTHROPIC_BASE_URL", "/f"],
+                           capture_output=True)
+            os.environ.pop("ANTHROPIC_BASE_URL", None)
     # New terminals pick this up; existing ones are unaffected.
+
+
+def _toggle_routing(icon, item) -> None:
+    _set_routing(not _routing_on())
 
 
 def main() -> None:
@@ -74,13 +80,19 @@ def main() -> None:
     def toggle_compress(icon, item):
         proxy.COMPRESS_ENABLED = not proxy.COMPRESS_ENABLED
 
+    def quit_tray(icon, item):
+        # Closing the tray must always return to a clean state: stop routing so a
+        # new Claude Code session never points at a now-dead proxy.
+        _set_routing(False)
+        icon.stop()
+
     menu = pystray.Menu(
         pystray.MenuItem(lambda item: f"Sarup proxy :{proxy.PORT}", None, enabled=False),
         pystray.MenuItem("Compression", toggle_compress, checked=lambda item: proxy.COMPRESS_ENABLED),
         pystray.MenuItem(lambda item: f"Saved: {proxy.total_saved():,} tok", None, enabled=False),
         pystray.Menu.SEPARATOR,
-        pystray.MenuItem("Route Claude Code (persistent)", _toggle_routing, checked=lambda item: _routing_on()),
-        pystray.MenuItem("Quit", lambda icon, item: icon.stop()),
+        pystray.MenuItem("Route Claude Code", _toggle_routing, checked=lambda item: _routing_on()),
+        pystray.MenuItem("Quit (stops proxy + unroutes)", quit_tray),
     )
     pystray.Icon("sarup", _make_icon_image(), "Sarup proxy", menu).run()
 
