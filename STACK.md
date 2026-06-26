@@ -16,7 +16,35 @@ What Sarup is built from, and the technique behind each part.
 | Storage | in-memory dict + optional SQLite | CCR (compress-and-cache-retrieval) original store |
 | Hash | SHA-256, first 24 hex chars | Deterministic, stable content key |
 | Build | hatchling | Simple PEP 621 packaging |
-| Tests | pytest + pytest-asyncio | 50 tests, all modes incl. Ollama-fallback paths |
+| Tests | pytest + pytest-asyncio | all modes incl. Ollama-fallback paths |
+
+## System architecture
+
+How the pieces fit — Sarup is a plain MCP stdio server, so it plugs into Claude Code as
+tools and never sits in the API request path:
+
+```mermaid
+flowchart TB
+    CC["🧑 Claude Code<br/>(any project)"]:::host
+    CC <-->|"MCP · stdio"| SRV["sarup.server<br/>sarup_compress · sarup_retrieve · sarup_stats"]:::mcp
+    SRV --> CMP{"compressor.py<br/>mode router + content routing"}:::engine
+    CMP --> THAI["thai.py<br/>PyThaiNLP newmm · TF-IDF"]:::lib
+    CMP --> SEM["semantic.py<br/>embeddings · centrality"]:::lib
+    CMP --> TOK["tokens.py<br/>tiktoken cl100k_base"]:::lib
+    SEM -. "embed / rewrite<br/>(optional)" .-> OLL["Ollama<br/>offline, may be absent"]:::ext
+    CMP ==>|"cache original"| ST[("store.py<br/>SQLite / memory<br/>hash → original")]:::store
+    SRV -. "sarup_retrieve(hash)" .-> ST
+
+    classDef host fill:#e0e7ff,stroke:#6366f1,color:#111
+    classDef mcp fill:#ddd6fe,stroke:#7c3aed,color:#111
+    classDef engine fill:#fde68a,stroke:#d97706,color:#111
+    classDef lib fill:#fef3c7,stroke:#f59e0b,color:#111
+    classDef ext fill:#e5e7eb,stroke:#6b7280,color:#111
+    classDef store fill:#bbf7d0,stroke:#16a34a,color:#111
+```
+
+If the server or Ollama is unavailable, Claude Code is unaffected — the tools simply
+go away (server) or compression falls back to the offline path (Ollama).
 
 ## Core architecture: two-tier guarantee
 
