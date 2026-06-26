@@ -46,7 +46,9 @@ class CompressionStore:
 
     @staticmethod
     def make_hash(content: str) -> str:
-        return hashlib.sha256(content.encode("utf-8")).hexdigest()[:24]
+        # surrogatepass so a stray lone surrogate (e.g. from Windows console
+        # capture) can never crash hashing.
+        return hashlib.sha256(content.encode("utf-8", "surrogatepass")).hexdigest()[:24]
 
     def store(
         self,

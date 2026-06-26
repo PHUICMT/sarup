@@ -31,9 +31,23 @@ BIG_THAI = "\n".join(
 )
 
 
+def _bash(output: str) -> dict:
+    """A PostToolUse payload shaped like Claude Code's real Bash event."""
+    return {"tool_name": "Bash", "tool_input": {"command": "x"},
+            "tool_response": {"stdout": output, "stderr": ""}}
+
+
+def test_extract_output_handles_real_shapes():
+    """tool_response is an object, not a string — extract per tool shape."""
+    assert sarup_hook._extract_output({"stdout": "hi", "stderr": ""}) == "hi"
+    assert sarup_hook._extract_output({"stdout": "a", "stderr": "b"}) == "a\nb"
+    assert sarup_hook._extract_output({"file": {"content": "doc"}}) == "doc"
+    assert sarup_hook._extract_output("plain") == "plain"
+    assert sarup_hook._extract_output({}) == ""
+
+
 def test_small_output_left_unchanged():
-    payload = {"tool_name": "Bash", "tool_input": {}, "tool_output": "short"}
-    assert sarup_hook.build_hook_output(payload) is None
+    assert sarup_hook.build_hook_output(_bash("short")) is None
 
 
 def test_code_file_read_is_skipped(monkeypatch):
@@ -41,7 +55,7 @@ def test_code_file_read_is_skipped(monkeypatch):
     payload = {
         "tool_name": "Read",
         "tool_input": {"file_path": "d:\\proj\\server.py"},
-        "tool_output": BIG_THAI,
+        "tool_response": {"file": {"content": BIG_THAI}},
     }
     assert sarup_hook.build_hook_output(payload) is None
 
@@ -51,8 +65,7 @@ def test_large_prose_is_compressed_and_recoverable(monkeypatch, tmp_path):
     monkeypatch.setenv("SARUP_DB_PATH", str(db))
     monkeypatch.setattr(sarup_hook, "MIN_CHARS", 100)
 
-    payload = {"tool_name": "Bash", "tool_input": {}, "tool_output": BIG_THAI}
-    out = sarup_hook.build_hook_output(payload)
+    out = sarup_hook.build_hook_output(_bash(BIG_THAI))
 
     assert out is not None
     updated = out["hookSpecificOutput"]["updatedToolOutput"]
@@ -70,16 +83,24 @@ def test_hook_output_is_ascii_safe(monkeypatch, tmp_path):
     can't crash it on Thai output. main() writes json.dumps(out) (ensure_ascii)."""
     monkeypatch.setenv("SARUP_DB_PATH", str(tmp_path / "c.db"))
     monkeypatch.setattr(sarup_hook, "MIN_CHARS", 100)
-    out = sarup_hook.build_hook_output(
-        {"tool_name": "Bash", "tool_input": {}, "tool_output": BIG_THAI}
-    )
+    out = sarup_hook.build_hook_output(_bash(BIG_THAI))
     assert out is not None
     json.dumps(out).encode("ascii")  # raises if any non-ASCII leaks to stdout
+
+
+def test_surrogate_output_does_not_crash(monkeypatch, tmp_path):
+    """Windows console capture can inject lone surrogates (\\udc81). The hook
+    must sanitize them, not crash in make_hash/tokenizer."""
+    monkeypatch.setenv("SARUP_DB_PATH", str(tmp_path / "c.db"))
+    monkeypatch.setattr(sarup_hook, "MIN_CHARS", 100)
+    dirty = BIG_THAI + "\udc81\udc82" + BIG_THAI  # lone surrogates in the middle
+    out = sarup_hook.build_hook_output(_bash(dirty))
+    assert out is not None  # compressed without raising
+    json.dumps(out).encode("ascii")
 
 
 def test_no_db_path_skips_substitution(monkeypatch):
     """Without a shared store, the original is unrecoverable → never substitute."""
     monkeypatch.delenv("SARUP_DB_PATH", raising=False)
     monkeypatch.setattr(sarup_hook, "MIN_CHARS", 100)
-    payload = {"tool_name": "Bash", "tool_input": {}, "tool_output": BIG_THAI}
-    assert sarup_hook.build_hook_output(payload) is None
+    assert sarup_hook.build_hook_output(_bash(BIG_THAI)) is None

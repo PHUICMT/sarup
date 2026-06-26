@@ -49,6 +49,30 @@ def _is_code_read(tool_name: str, tool_input: dict) -> bool:
     return ext in _CODE_EXTS
 
 
+def _extract_output(tool_response) -> str:
+    """Pull the human-readable text out of a PostToolUse `tool_response`.
+
+    Claude Code sends `tool_response`, whose shape depends on the tool:
+      Bash → {"stdout": str, "stderr": str, ...}
+      Read → {"file": {"content": str, ...}} (or a plain str)
+      Grep → str, or {"content"/"output": str}
+    """
+    if isinstance(tool_response, str):
+        return tool_response
+    if isinstance(tool_response, dict):
+        if "stdout" in tool_response:  # Bash
+            out = tool_response.get("stdout") or ""
+            err = tool_response.get("stderr") or ""
+            return out + (("\n" + err) if err else "")
+        f = tool_response.get("file")  # Read
+        if isinstance(f, dict) and isinstance(f.get("content"), str):
+            return f["content"]
+        for k in ("content", "output", "result", "text"):  # generic
+            if isinstance(tool_response.get(k), str):
+                return tool_response[k]
+    return ""
+
+
 def build_hook_output(payload: dict) -> dict | None:
     """Core logic. Returns the hook JSON dict, or None to leave output unchanged.
 
@@ -56,7 +80,10 @@ def build_hook_output(payload: dict) -> dict | None:
     """
     tool_name = payload.get("tool_name", "")
     tool_input = payload.get("tool_input", {}) or {}
-    output = payload.get("tool_output", "") or ""
+    output = _extract_output(payload.get("tool_response", ""))
+    # Windows console capture can leave lone surrogates (surrogateescape) in the
+    # text; drop them so hashing/tokenizing downstream can't raise UnicodeError.
+    output = output.encode("utf-8", "surrogatepass").decode("utf-8", "replace")
 
     if len(output) < MIN_CHARS:
         return None
