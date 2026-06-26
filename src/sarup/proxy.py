@@ -42,6 +42,11 @@ PROXY_MIN_CHARS = int(os.environ.get("SARUP_PROXY_MIN_CHARS", "2000"))
 PROXY_KEEP_RECENT = max(1, int(os.environ.get("SARUP_PROXY_KEEP_RECENT", "4")))
 
 _store = None
+_total_saved = 0  # cumulative tokens saved this run (for the tray UI / stats)
+
+
+def total_saved() -> int:
+    return _total_saved
 
 # Headers we must not forward verbatim (hop-by-hop / recomputed by httpx).
 _DROP_REQUEST_HEADERS = {"host", "content-length", "connection", "accept-encoding"}
@@ -129,6 +134,8 @@ def _maybe_compress_body(raw: bytes, path: str) -> tuple[bytes, int]:
         saved = sum(_compress_message(m) for m in targets if isinstance(m, dict))
         if saved <= 0:
             return raw, 0
+        global _total_saved
+        _total_saved += saved
         return json.dumps(data, ensure_ascii=False).encode("utf-8"), saved
     except Exception:
         return raw, 0  # never break the request

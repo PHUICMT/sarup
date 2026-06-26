@@ -215,6 +215,21 @@ stops the proxy on exit):
 ./scripts/sarup-claude.sh           # Linux / WSL / macOS
 ```
 
+### Always-on (system tray + autostart)
+
+Run the proxy quietly in the background with a tray icon (compression toggle,
+cumulative tokens saved, Claude Code routing toggle, quit):
+
+```powershell
+pip install -e ".[tray]"
+sarup-tray                              # or: pythonw -m sarup.tray (no console)
+.\scripts\install-autostart.ps1         # start on every login (-Remove to undo)
+```
+
+The tray's proxy runs offline (extractive) — **it does not depend on Ollama**, which
+can start later or never. Routing Claude Code through it is an explicit toggle in the
+tray menu, so autostart alone changes nothing until you opt in.
+
 | Var | Default | Meaning |
 |-----|---------|---------|
 | `SARUP_PROXY_COMPRESS` | `0` | `1` enables compression (else pure passthrough) |
