@@ -15,7 +15,7 @@ $pythonw = Join-Path $repo ".venv\Scripts\pythonw.exe"
 if ($Stop) {
     Get-CimInstance Win32_Process -Filter "Name = 'pythonw.exe'" |
         Where-Object { $_.CommandLine -like "*sarup.tray*" } |
-        ForEach-Object { Stop-Process -Id $_.ProcessId -Force; Write-Host "Stopped tray (PID $($_.ProcessId))." }
+        ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue; Write-Host "Stopped tray (PID $($_.ProcessId))." }
     return
 }
 

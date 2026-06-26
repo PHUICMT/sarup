@@ -8,7 +8,8 @@ The proxy uses the offline `extractive` mode by default, so it does NOT depend o
 Ollama — Ollama may start later (or never); compression keeps working.
 
 Run:
-    sarup-tray                 # or:  pythonw -m sarup.tray   (no console window)
+    sarup-tray                 # prints starting/started, spawns detached, returns —
+                               # close the console and the tray keeps running.
 
 Needs the [tray] extra:  pip install -e ".[tray]"
 """
@@ -68,7 +69,56 @@ def _toggle_routing(icon, item) -> None:
     _set_routing(not _routing_on())
 
 
+def _proxy_healthy(timeout: float = 1.0) -> bool:
+    import urllib.request
+
+    try:
+        with urllib.request.urlopen(f"http://localhost:{proxy.PORT}/health", timeout=timeout) as r:
+            return r.status == 200
+    except Exception:
+        return False
+
+
 def main() -> None:
+    """Launcher: spawn the tray detached so the console returns and can be closed.
+
+    Re-execs this module with SARUP_TRAY_CHILD=1 via pythonw (no console window,
+    survives the parent console closing). The child runs `_run_tray()`.
+    """
+    import sys
+    import time
+
+    if os.environ.get("SARUP_TRAY_CHILD") == "1":
+        _run_tray()
+        return
+
+    if _proxy_healthy():
+        print(f"Sarup tray: already running (proxy on :{proxy.PORT}).")
+        return
+
+    print("Sarup tray: starting...")
+    exe = sys.executable
+    pyw = os.path.join(os.path.dirname(exe), "pythonw.exe")
+    launcher = pyw if os.path.exists(pyw) else exe
+    env = {**os.environ, "SARUP_TRAY_CHILD": "1"}
+
+    kwargs = dict(stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
+                  stderr=subprocess.DEVNULL, close_fds=True, env=env)
+    if os.name == "nt":
+        kwargs["creationflags"] = subprocess.DETACHED_PROCESS | subprocess.CREATE_NEW_PROCESS_GROUP
+    else:
+        kwargs["start_new_session"] = True
+    subprocess.Popen([launcher, "-m", "sarup.tray"], **kwargs)
+
+    for _ in range(20):  # wait up to ~5s for the proxy to answer
+        if _proxy_healthy():
+            print(f"Sarup tray: started (proxy on :{proxy.PORT}). You can close this console.")
+            return
+        time.sleep(0.25)
+    print("Sarup tray: launched (proxy not confirmed yet — check the tray icon).")
+
+
+def _run_tray() -> None:
     import pystray
 
     # The tray exists to auto-compress, so default compression ON (unless the
