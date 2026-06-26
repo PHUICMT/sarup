@@ -295,7 +295,7 @@ the cache on restart, and the hook will not substitute — see the hook docs).
 | `SARUP_ABSTRACTIVE_MODEL` | `gemma3:12b`             | Model for abstractive / pipeline rewrite.                                                |
 | `SARUP_EMBED_MODEL`       | `nomic-embed-text`       | Model for semantic embeddings.                                                           |
 | `SARUP_HOOK_MODE`         | `auto`                   | Hook compression mode.                                                                   |
-| `SARUP_HOOK_MIN_CHARS`    | `4000`                   | Hook only compresses outputs larger than this.                                           |
+| `SARUP_HOOK_MIN_TOKENS`   | `400`                    | Hook only compresses outputs with at least this many tokens (token-based, fair across languages). |
 
 ## Project structure
 

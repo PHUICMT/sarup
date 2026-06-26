@@ -56,7 +56,7 @@ the model may want verbatim.
 
 | Var | Default | Meaning |
 |-----|---------|---------|
-| `SARUP_HOOK_MIN_CHARS` | `4000` | Only compress outputs larger than this |
+| `SARUP_HOOK_MIN_TOKENS` | `400` | Only compress outputs with at least this many tokens (token-based so it's fair across Thai/English/code) |
 | `SARUP_HOOK_MODE` | `auto` | `auto` (semantic if Ollama is up, else extractive), or force `extractive` (offline, ~1ms) / `semantic` (Ollama, higher ratio, slower) |
 | `SARUP_DB_PATH` | *(in-memory)* | Shared SQLite store — **required** for cross-process retrieval |
 

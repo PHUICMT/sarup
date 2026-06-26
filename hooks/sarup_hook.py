@@ -35,7 +35,10 @@ _CODE_EXTS = {
     ".yaml", ".yml", ".toml", ".ini", ".cfg", ".xml", ".csv", ".tsv",
 }
 
-MIN_CHARS = int(os.environ.get("SARUP_HOOK_MIN_CHARS", "4000"))
+# Token-based threshold (fair across languages): in cl100k_base, Thai is ~1
+# token/char but English is ~0.2, so a *char* threshold would make this Thai-first
+# tool skip token-heavy Thai blocks while over-compressing English. Default 400 tok.
+MIN_TOKENS = int(os.environ.get("SARUP_HOOK_MIN_TOKENS", "400"))
 # 'auto' = semantic when Ollama is up (best ratio), else extractive offline.
 HOOK_MODE = os.environ.get("SARUP_HOOK_MODE", "auto")
 
@@ -85,7 +88,11 @@ def build_hook_output(payload: dict) -> dict | None:
     # text; drop them so hashing/tokenizing downstream can't raise UnicodeError.
     output = output.encode("utf-8", "surrogatepass").decode("utf-8", "replace")
 
-    if len(output) < MIN_CHARS:
+    # Cheap pre-gate: skip clearly-small outputs WITHOUT loading the tokenizer
+    # (the hook is a fresh process per call). Thai is ~1 token/char, so anything
+    # shorter than MIN_TOKENS chars can't reach MIN_TOKENS tokens — the real
+    # token-based decision happens below.
+    if len(output) < MIN_TOKENS:
         return None
     if _is_code_read(tool_name, tool_input):
         return None
@@ -100,6 +107,12 @@ def build_hook_output(payload: dict) -> dict | None:
     # Imported lazily so an import error never breaks the user's tool result.
     from sarup.compressor import compress
     from sarup.store import CompressionStore
+    from sarup.tokens import count_tokens
+
+    # Real gate: only worth it past MIN_TOKENS — below that the ~30-token footer
+    # and retrieval indirection cost more than compression saves.
+    if count_tokens(output) < MIN_TOKENS:
+        return None
 
     result = compress(output, mode=HOOK_MODE)
     if result.tokens_saved <= 0 or result.compressed == output:

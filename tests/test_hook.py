@@ -51,7 +51,7 @@ def test_small_output_left_unchanged():
 
 
 def test_code_file_read_is_skipped(monkeypatch):
-    monkeypatch.setattr(sarup_hook, "MIN_CHARS", 10)
+    monkeypatch.setattr(sarup_hook, "MIN_TOKENS", 10)
     payload = {
         "tool_name": "Read",
         "tool_input": {"file_path": "d:\\proj\\server.py"},
@@ -63,7 +63,7 @@ def test_code_file_read_is_skipped(monkeypatch):
 def test_large_prose_is_compressed_and_recoverable(monkeypatch, tmp_path):
     db = tmp_path / "cache.db"
     monkeypatch.setenv("SARUP_DB_PATH", str(db))
-    monkeypatch.setattr(sarup_hook, "MIN_CHARS", 100)
+    monkeypatch.setattr(sarup_hook, "MIN_TOKENS", 100)
 
     out = sarup_hook.build_hook_output(_bash(BIG_THAI))
 
@@ -82,7 +82,7 @@ def test_hook_output_is_ascii_safe(monkeypatch, tmp_path):
     """Regression: hook stdout must be pure ASCII so a cp1252 console (Windows)
     can't crash it on Thai output. main() writes json.dumps(out) (ensure_ascii)."""
     monkeypatch.setenv("SARUP_DB_PATH", str(tmp_path / "c.db"))
-    monkeypatch.setattr(sarup_hook, "MIN_CHARS", 100)
+    monkeypatch.setattr(sarup_hook, "MIN_TOKENS", 100)
     out = sarup_hook.build_hook_output(_bash(BIG_THAI))
     assert out is not None
     json.dumps(out).encode("ascii")  # raises if any non-ASCII leaks to stdout
@@ -92,7 +92,7 @@ def test_surrogate_output_does_not_crash(monkeypatch, tmp_path):
     """Windows console capture can inject lone surrogates (\\udc81). The hook
     must sanitize them, not crash in make_hash/tokenizer."""
     monkeypatch.setenv("SARUP_DB_PATH", str(tmp_path / "c.db"))
-    monkeypatch.setattr(sarup_hook, "MIN_CHARS", 100)
+    monkeypatch.setattr(sarup_hook, "MIN_TOKENS", 100)
     dirty = BIG_THAI + "\udc81\udc82" + BIG_THAI  # lone surrogates in the middle
     out = sarup_hook.build_hook_output(_bash(dirty))
     assert out is not None  # compressed without raising
@@ -102,5 +102,5 @@ def test_surrogate_output_does_not_crash(monkeypatch, tmp_path):
 def test_no_db_path_skips_substitution(monkeypatch):
     """Without a shared store, the original is unrecoverable → never substitute."""
     monkeypatch.delenv("SARUP_DB_PATH", raising=False)
-    monkeypatch.setattr(sarup_hook, "MIN_CHARS", 100)
+    monkeypatch.setattr(sarup_hook, "MIN_TOKENS", 100)
     assert sarup_hook.build_hook_output(_bash(BIG_THAI)) is None
