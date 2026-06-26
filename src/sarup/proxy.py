@@ -147,8 +147,19 @@ def _filter_headers(headers, drop: set[str]) -> dict[str, str]:
 
 @app.get("/health")
 async def health() -> JSONResponse:
+    # "mode" reports what the proxy actually does to request bodies: the active
+    # compression mode when enabled, else plain passthrough.
+    mode = PROXY_MODE if COMPRESS_ENABLED else "passthrough"
     return JSONResponse(
-        {"ok": True, "upstream": UPSTREAM, "compress": COMPRESS_ENABLED, "mode": "passthrough"}
+        {
+            "ok": True,
+            "upstream": UPSTREAM,
+            "compress": COMPRESS_ENABLED,
+            "mode": mode,
+            "min_chars": PROXY_MIN_CHARS,
+            "keep_recent": PROXY_KEEP_RECENT,
+            "tokens_saved": _total_saved,
+        }
     )
 
 
