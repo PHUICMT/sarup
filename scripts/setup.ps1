@@ -1,5 +1,5 @@
 <#
-One-command Sarup setup (Windows). Idempotent — safe to re-run.
+One-command Sarup setup (Windows). Idempotent - safe to re-run.
 
     .\scripts\setup.ps1            # venv + install + register MCP (user scope)
     .\scripts\setup.ps1 -All       # also: auto-compress hook, tray autostart, pull models
@@ -41,7 +41,7 @@ if ($claude) {
     & claude mcp remove sarup -s user 2>$null | Out-Null
     & claude mcp add sarup --scope user --env "SARUP_DB_PATH=$db" -- $py -m sarup.server
 } else {
-    Write-Warning "  'claude' not on PATH — skipped. Run later:"
+    Write-Warning "  'claude' not on PATH - skipped. Run later:"
     Write-Host "    claude mcp add sarup --scope user --env SARUP_DB_PATH=$db -- $py -m sarup.server"
 }
 

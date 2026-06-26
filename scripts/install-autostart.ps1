@@ -5,7 +5,7 @@ Drops a shortcut in the user's Startup folder that runs `pythonw -m sarup.tray`.
     .\scripts\install-autostart.ps1            # install
     .\scripts\install-autostart.ps1 -Remove    # uninstall
 
-The proxy runs offline (extractive) — it does NOT need Ollama, which may start
+The proxy runs offline (extractive) - it does NOT need Ollama, which may start
 later. Routing Claude Code through it is a separate, explicit toggle in the tray
 menu ("Route Claude Code"), so installing autostart alone changes nothing until
 you opt in.
