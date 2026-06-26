@@ -140,10 +140,29 @@ Token counts via tiktoken `cl100k_base` — a real tokenizer, not a byte heurist
 
 ## Install
 
+**One command** (creates the venv, installs everything, registers the MCP server
+for all projects — idempotent):
+
+```powershell
+.\scripts\setup.ps1 -All      # Windows  (-All also adds the hook, tray autostart, pulls models)
+./scripts/setup.sh --all      # Linux / WSL / macOS
+```
+
+Uninstall just as cleanly (only removes what Sarup added; `-Purge`/`--purge` also
+deletes the venv + cache):
+
+```powershell
+.\scripts\uninstall.ps1       # Windows
+./scripts/uninstall.sh        # Linux / WSL / macOS
+```
+
+<details><summary>Manual install</summary>
+
 ```powershell
 py -3.11 -m venv .venv
 .\.venv\Scripts\python.exe -m pip install -e ".[dev]"
 ```
+</details>
 
 Optional local-LLM modes (`semantic` / `abstractive` / `pipeline`) need [Ollama](https://ollama.com):
 
