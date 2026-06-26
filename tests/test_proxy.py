@@ -28,6 +28,7 @@ def test_disabled_is_identity():
 
 def test_compresses_old_thai_turn_and_caches(monkeypatch, tmp_path):
     monkeypatch.setattr(proxy, "COMPRESS_ENABLED", True)
+    monkeypatch.setattr(proxy, "PROXY_KEEP_RECENT", 2)  # keep last 2 verbatim
     monkeypatch.setattr(proxy, "_store", None)
     monkeypatch.setenv("SARUP_DB_PATH", str(tmp_path / "proxy.db"))
 
@@ -58,6 +59,7 @@ def test_compresses_old_thai_turn_and_caches(monkeypatch, tmp_path):
 
 def test_cache_control_block_is_skipped(monkeypatch, tmp_path):
     monkeypatch.setattr(proxy, "COMPRESS_ENABLED", True)
+    monkeypatch.setattr(proxy, "PROXY_KEEP_RECENT", 1)  # so msg[0] is a target
     monkeypatch.setattr(proxy, "_store", None)
     monkeypatch.setenv("SARUP_DB_PATH", str(tmp_path / "p.db"))
     body = {"messages": [

@@ -34,6 +34,12 @@ PORT = int(os.environ.get("SARUP_PROXY_PORT", "8788"))
 # Hot-path defaults: offline extractive (~1ms), only big Thai blocks.
 PROXY_MODE = os.environ.get("SARUP_PROXY_MODE", "extractive")
 PROXY_MIN_CHARS = int(os.environ.get("SARUP_PROXY_MIN_CHARS", "2000"))
+# Prompt-cache safety: never compress the last N messages (the "settle window").
+# Older turns are compressed deterministically (extractive) → the compressed
+# prefix is byte-stable across requests, so Anthropic prompt-cache can still hit;
+# only the single message aging past the window churns once per turn. Larger N =
+# more cache-friendly, fewer savings. Use mode=extractive to keep it deterministic.
+PROXY_KEEP_RECENT = max(1, int(os.environ.get("SARUP_PROXY_KEEP_RECENT", "4")))
 
 _store = None
 
@@ -116,9 +122,11 @@ def _maybe_compress_body(raw: bytes, path: str) -> tuple[bytes, int]:
     try:
         data = json.loads(raw)
         msgs = data.get("messages")
-        if not isinstance(msgs, list) or len(msgs) <= 1:
+        if not isinstance(msgs, list) or len(msgs) <= PROXY_KEEP_RECENT:
             return raw, 0
-        saved = sum(_compress_message(m) for m in msgs[:-1] if isinstance(m, dict))
+        # Keep the last PROXY_KEEP_RECENT messages verbatim (cache settle window).
+        targets = msgs[:-PROXY_KEEP_RECENT]
+        saved = sum(_compress_message(m) for m in targets if isinstance(m, dict))
         if saved <= 0:
             return raw, 0
         return json.dumps(data, ensure_ascii=False).encode("utf-8"), saved

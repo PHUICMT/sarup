@@ -207,11 +207,20 @@ $env:SARUP_PROXY_COMPRESS="1"; $env:SARUP_DB_PATH="…\.sarup-cache.db"; sarup-p
 $env:ANTHROPIC_BASE_URL="http://localhost:8788"; claude
 ```
 
+Or one command (starts the proxy, waits for health, launches Claude through it, and
+stops the proxy on exit):
+
+```powershell
+.\scripts\sarup-claude.ps1          # Windows
+./scripts/sarup-claude.sh           # Linux / WSL / macOS
+```
+
 | Var | Default | Meaning |
 |-----|---------|---------|
 | `SARUP_PROXY_COMPRESS` | `0` | `1` enables compression (else pure passthrough) |
 | `SARUP_PROXY_MODE` | `extractive` | Compression mode (extractive is offline & fast — best for the hot path) |
 | `SARUP_PROXY_MIN_CHARS` | `2000` | Only compress blocks larger than this |
+| `SARUP_PROXY_KEEP_RECENT` | `4` | Keep the last N messages verbatim (prompt-cache settle window — higher = more cache-safe, fewer savings) |
 | `SARUP_PROXY_PORT` | `8788` | Listen port |
 | `SARUP_PROXY_UPSTREAM` | `https://api.anthropic.com` | Real API base |
 
