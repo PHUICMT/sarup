@@ -54,11 +54,23 @@ Only offer this if the user asks for automatic compression. The `PostToolUse` ho
 compresses large tool outputs (≥ `SARUP_HOOK_MIN_TOKENS`, default 400) and needs
 Claude Code ≥ 2.1.186.
 
-⚠️ **Do not install it globally on a machine used for coding** — it compresses large
-`Bash`/`Grep` output, which can drop detail the model needs verbatim (recoverable via
-`sarup_retrieve`, but inconvenient mid-task). Prefer per-project install in
-documentation/Thai-heavy projects. To install: `python scripts/install.py --with-hook`
-(add `--global` for `~/.claude`). See `hooks/README.md`.
+⚠️ It compresses large `Bash`/`Grep` output, which can drop detail the model needs
+verbatim (recoverable via `sarup_retrieve`, but inconvenient mid-task). So **prefer
+installing it per-project** in documentation / Thai-heavy projects, and **skip it in
+code-heavy projects**. Ask the user which project before installing.
+
+Run `install.py` with the repo's venv python (paths inside it always point back at the
+Sarup repo, so the target project just references them):
+
+- **This/that specific project (recommended):**
+  `<venv-python> <repo>/scripts/install.py --with-hook --project "<project-dir>"`
+  (omit the value to use the current directory: `--project`). Writes only the hook into
+  `<project-dir>/.claude/settings.json`; the MCP stays user-scoped.
+- **Every project (only if the user insists):** `… install.py --with-hook --global`
+
+To remove a per-project hook later:
+`<venv-python> <repo>/scripts/install.py --uninstall --project "<project-dir>"`.
+See `hooks/README.md` for tuning (`SARUP_HOOK_MIN_TOKENS`, `SARUP_HOOK_MODE`).
 
 ## Notes
 

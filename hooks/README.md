@@ -20,8 +20,16 @@ retrieval hash in a footer, so full detail is always one `sarup_retrieve` away.
 
 ## Install
 
-Easiest: run `python scripts/install.py --with-hook` (use `--global` for `~/.claude`),
-which fills in the real paths for you. Or add it by hand to `.claude/settings.json`
+Easiest: run `python scripts/install.py --with-hook`, which fills in the real paths.
+Scope it:
+
+- `--project "<dir>"` — install **only** into that project's `.claude/settings.json`
+  (omit the value for the current dir). Recommended — keeps the hook out of code-heavy
+  projects. The MCP server stays user-scoped.
+- `--global` — into `~/.claude` (every project; avoid on coding machines).
+- (no flag) — into this repo's own `.claude` (dev/testing).
+
+Or add it by hand to `.claude/settings.json`
 (project) or `~/.claude/settings.json` (global), replacing `<SARUP_DIR>` with your
 clone path (on Linux/macOS the interpreter is `<SARUP_DIR>/.venv/bin/python`):
 

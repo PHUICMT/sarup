@@ -9,10 +9,13 @@ What it does:
   4. Idempotent — running twice changes nothing.
 
 Usage:
-    python scripts/install.py              # project-level config (default)
+    python scripts/install.py              # MCP into this repo's config (dev default)
     python scripts/install.py --with-hook  # also install the auto-compression hook
     python scripts/install.py --pull       # pull recommended Ollama models if missing
-    python scripts/install.py --global     # write to ~/.claude instead of the project
+    python scripts/install.py --global     # write to ~/.claude instead of the repo
+    python scripts/install.py --with-hook --project PATH   # hook only, into PATH/.claude
+                                           # (PATH defaults to the current dir; the MCP
+                                           #  stays user-scoped via `claude mcp add`)
 
 Pure stdlib. Never deletes keys it didn't add.
 """
@@ -220,8 +223,37 @@ def main() -> None:
     ap.add_argument("--with-hook", action="store_true", help="also install the auto-compression hook")
     ap.add_argument("--pull", action="store_true", help="pull recommended Ollama models if missing")
     ap.add_argument("--global", dest="is_global", action="store_true", help="write to ~/.claude")
+    ap.add_argument("--project", nargs="?", const=os.getcwd(), default=None, metavar="PATH",
+                    help="install the hook into PATH/.claude/settings.json (default: current dir); "
+                         "MCP is left to user scope")
     ap.add_argument("--uninstall", action="store_true", help="remove only what Sarup added")
     args = ap.parse_args()
+
+    # Per-project mode: target an arbitrary project's .claude, hook only (the MCP
+    # server is meant to live at user scope via `claude mcp add`, shared by all projects).
+    if args.project is not None:
+        proj = Path(args.project).resolve()
+        settings_path = proj / ".claude" / "settings.json"
+        if args.uninstall:
+            print(f"Removing Sarup hook from project: {proj}")
+            unmerge_hook(settings_path)
+            print("\nDone. Restart Claude Code.")
+            return
+        if not args.with_hook:
+            print("Nothing to do — per-project install is hook-only; pass --with-hook.")
+            print("(The MCP server should be registered once at user scope: `claude mcp add ... -s user`.)")
+            return
+        py = venv_python()
+        db = str(REPO / ".sarup-cache.db")
+        hook = str(REPO / "hooks" / "sarup_hook.py")
+        rec = recommend(ollama_models())
+        env = {"SARUP_DB_PATH": db, "SARUP_HOOK_MODE": rec["hook_mode"]}
+        if rec["gen"]:
+            env["SARUP_ABSTRACTIVE_MODEL"] = rec["gen"]
+        print(f"Installing per-project Sarup hook into: {settings_path}")
+        merge_hook(settings_path, py, hook, env)
+        print("\nDone. Restart Claude Code — the hook now runs only in this project.")
+        return
 
     base = Path.home() / ".claude" if args.is_global else REPO
     mcp_path = (Path.home() / ".claude.json") if args.is_global else (REPO / ".mcp.json")
