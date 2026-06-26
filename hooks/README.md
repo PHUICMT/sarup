@@ -6,13 +6,11 @@ Compress large tool outputs **automatically** — no need for the model to call
 (`updatedToolOutput`), and caches the original so `sarup_retrieve(hash)` still
 recovers it byte-for-byte.
 
-> **⚠️ Status (June 2026): experimental — pending Claude Code support.**
-> The hook is invoked correctly and emits a valid `updatedToolOutput`, but
-> Claude Code **2.1.167 and 2.1.193 do not apply it** — the model still receives
-> the full tool result (verified live). The [hooks docs](https://code.claude.com/docs/en/hooks)
-> say `updatedToolOutput` replaces the result, so this should start working on a
-> build that honors it. **Until then, use the manual `sarup_compress` tool**
-> (fully working). This hook is ready for the day Claude Code applies the field.
+> **Requires Claude Code ≥ 2.1.186.** That release is when `PostToolUse` started
+> applying a hook's `updatedToolOutput` (the docs describe it
+> [here](https://code.claude.com/docs/en/hooks)); earlier builds invoked the hook but
+> ignored the substitution. On a supported build the compressed output replaces the
+> original in context. The manual `sarup_compress` tool works on any version.
 
 ## How it stays 100% accurate
 
@@ -22,7 +20,10 @@ retrieval hash in a footer, so full detail is always one `sarup_retrieve` away.
 
 ## Install
 
-Add to `.claude/settings.json` (project) or `~/.claude/settings.json` (global):
+Easiest: run `python scripts/install.py --with-hook` (use `--global` for `~/.claude`),
+which fills in the real paths for you. Or add it by hand to `.claude/settings.json`
+(project) or `~/.claude/settings.json` (global), replacing `<SARUP_DIR>` with your
+clone path (on Linux/macOS the interpreter is `<SARUP_DIR>/.venv/bin/python`):
 
 ```json
 {
@@ -33,7 +34,7 @@ Add to `.claude/settings.json` (project) or `~/.claude/settings.json` (global):
         "hooks": [
           {
             "type": "command",
-            "command": "d:\\WORK\\Sarup\\.venv\\Scripts\\python.exe d:\\WORK\\Sarup\\hooks\\sarup_hook.py",
+            "command": "<SARUP_DIR>/.venv/Scripts/python.exe <SARUP_DIR>/hooks/sarup_hook.py",
             "timeout": 15
           }
         ]
@@ -41,20 +42,22 @@ Add to `.claude/settings.json` (project) or `~/.claude/settings.json` (global):
     ]
   },
   "env": {
-    "SARUP_DB_PATH": "d:\\WORK\\Sarup\\.sarup-cache.db"
+    "SARUP_DB_PATH": "<SARUP_DIR>/.sarup-cache.db"
   }
 }
 ```
 
 Point the MCP server at the **same** `SARUP_DB_PATH` so retrieval works across
-processes.
+processes. **For code-heavy projects, prefer per-project install (or skip the hook)** —
+it skips source-file reads, but compressing large `Bash`/`Grep` output can drop detail
+the model may want verbatim.
 
 ## Tuning (env vars)
 
 | Var | Default | Meaning |
 |-----|---------|---------|
 | `SARUP_HOOK_MIN_CHARS` | `4000` | Only compress outputs larger than this |
-| `SARUP_HOOK_MODE` | `extractive` | `extractive` (offline, ~1ms) or `semantic` (Ollama, higher ratio, slower) |
+| `SARUP_HOOK_MODE` | `auto` | `auto` (semantic if Ollama is up, else extractive), or force `extractive` (offline, ~1ms) / `semantic` (Ollama, higher ratio, slower) |
 | `SARUP_DB_PATH` | *(in-memory)* | Shared SQLite store — **required** for cross-process retrieval |
 
 ## Safety

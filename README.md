@@ -17,6 +17,7 @@
 - [Install](#install)
 - [Register with Claude Code](#register-with-claude-code)
 - [Auto-compression hook](#auto-compression-hook)
+- [Privacy &amp; data](#privacy--data)
 - [Configuration](#configuration)
 - [Project structure](#project-structure)
 - [Tech stack &amp; techniques](#tech-stack--techniques)
@@ -173,19 +174,23 @@ ollama pull gemma3:12b           # rewrite → abstractive / pipeline (Thai-vali
   and sets the hook to `auto`. `--pull` fetches any missing models.
 - Idempotent — safe to re-run; `--global` writes to `~/.claude` instead.
 
-**Manual** — or add it yourself to your MCP config (e.g. `.mcp.json` or `~/.claude.json`):
+**Manual** — or add it yourself to your MCP config (e.g. `.mcp.json` or `~/.claude.json`).
+Replace `<SARUP_DIR>` with the absolute path where you cloned this repo (the installer
+above fills these in for you):
 
 ```json
 {
   "mcpServers": {
     "sarup": {
-      "command": "d:\\WORK\\Sarup\\.venv\\Scripts\\python.exe",
+      "command": "<SARUP_DIR>/.venv/Scripts/python.exe",
       "args": ["-m", "sarup.server"],
-      "env": { "SARUP_DB_PATH": "d:\\WORK\\Sarup\\.sarup-cache.db" }
+      "env": { "SARUP_DB_PATH": "<SARUP_DIR>/.sarup-cache.db" }
     }
   }
 }
 ```
+
+> On Linux/macOS the interpreter is `<SARUP_DIR>/.venv/bin/python`.
 
 Or run it directly over stdio:
 
@@ -199,9 +204,10 @@ Skip manual tool calls entirely: install the **PostToolUse hook** and large `Rea
 outputs are compressed before they enter context, with the original cached for retrieval.
 Source-code reads are skipped for safety. Full setup in **[hooks/README.md](hooks/README.md)**.
 
-> **Experimental:** the hook emits a valid `updatedToolOutput`, but current Claude Code builds
-> (2.1.167 / 2.1.193) don't yet apply it, so it's a no-op in-session today. Use the manual
-> `sarup_compress` tool meanwhile — the hook is ready for when Claude Code honors the field.
+> **Requires Claude Code ≥ 2.1.186**, which is when `PostToolUse` began applying a
+> hook's `updatedToolOutput` (earlier builds ran the hook but ignored the substitution).
+> Replace `<SARUP_DIR>` with your clone path — or just run `install.py --with-hook`, which
+> writes this for you.
 
 ```json
 {
@@ -209,10 +215,10 @@ Source-code reads are skipped for safety. Full setup in **[hooks/README.md](hook
     "PostToolUse": [
       { "matcher": "Read|Bash|Grep",
         "hooks": [{ "type": "command",
-          "command": "d:\\WORK\\Sarup\\.venv\\Scripts\\python.exe d:\\WORK\\Sarup\\hooks\\sarup_hook.py" }] }
+          "command": "<SARUP_DIR>/.venv/Scripts/python.exe <SARUP_DIR>/hooks/sarup_hook.py" }] }
     ]
   },
-  "env": { "SARUP_DB_PATH": "d:\\WORK\\Sarup\\.sarup-cache.db" }
+  "env": { "SARUP_DB_PATH": "<SARUP_DIR>/.sarup-cache.db" }
 }
 ```
 
