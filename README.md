@@ -241,9 +241,12 @@ cumulative tokens saved, Claude Code routing toggle, quit):
 
 ```powershell
 pip install -e ".[tray]"
-sarup-tray                              # or: pythonw -m sarup.tray (no console)
+.\scripts\start-tray.ps1                # run now in the background (terminal returns)
 .\scripts\install-autostart.ps1         # start on every login (-Remove to undo)
 ```
+
+(`sarup-tray` runs in the foreground and blocks the terminal — use `start-tray.ps1`,
+or `.\scripts\start-tray.ps1 -Stop` to stop it.)
 
 The tray's proxy runs offline (extractive) — **it does not depend on Ollama**, which
 can start later or never. Routing Claude Code through it is an explicit toggle in the
