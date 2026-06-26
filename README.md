@@ -1,6 +1,26 @@
 <div align="center">
 
----
+# สรุป · Sarup
+
+**Thai-first context compression for Claude Code.**
+An MCP server that actually shrinks Thai — 50–88% fewer tokens — and caches every original
+so nothing is ever lost.
+
+[![CI](https://github.com/PHUICMT/sarup/actions/workflows/ci.yml/badge.svg)](https://github.com/PHUICMT/sarup/actions/workflows/ci.yml)
+&nbsp;![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)
+&nbsp;![Python](https://img.shields.io/badge/python-3.11%2B-blue.svg)
+&nbsp;![MCP](https://img.shields.io/badge/MCP-server-8A2BE2.svg)
+&nbsp;![tests](https://img.shields.io/badge/tests-55%20passing-brightgreen.svg)
+
+<!--
+Quickstart demo GIF goes here. To record one:
+  1) asciinema rec demo.cast      (or: terminalizer record demo)
+  2) agg demo.cast docs/quickstart.gif   (asciinema -> gif)
+  3) uncomment the line below and commit docs/quickstart.gif
+-->
+<!-- ![Sarup quickstart](docs/quickstart.gif) -->
+
+</div>
 
 > *สรุป* means "to summarize." Headroom routes Thai through `noop` (0% savings) because its
 > whitespace tokenizer can't find Thai word boundaries. Sarup uses PyThaiNLP segmentation, so it
@@ -14,6 +34,7 @@
 - [Tools](#tools)
 - [Compression modes](#compression-modes)
 - [Measured results](#measured-results)
+- [Example](#example)
 - [Install](#install)
 - [Register with Claude Code](#register-with-claude-code)
 - [Auto-compression hook](#auto-compression-hook)
@@ -124,6 +145,33 @@ Mode comparison (Thai prose, 522 tok):
 ```
 
 Token counts via tiktoken `cl100k_base` — a real tokenizer, not a byte heuristic.
+
+## Example
+
+A real `sarup_compress` call on a Thai paragraph (`mode="auto"`, Ollama up → semantic):
+
+```jsonc
+// → sarup_compress(content="…518-token Thai paragraph…", mode="auto")
+{
+  "compressed": "จุดเด่นที่สำคัญที่สุดคือมันไม่มีทางทำให้ Claude พัง…",
+  "hash": "caa568140bec0ff734937cf5",
+  "original_tokens": 518,
+  "compressed_tokens": 154,
+  "tokens_saved": 364,
+  "savings_percent": 70.3,
+  "transforms": ["semantic_extractive", "embeddings", "thai"],
+  "lossy": true,
+  "verified": true,                    // round-trip proven byte-for-byte
+  "token_method": "tiktoken:cl100k_base"
+}
+```
+
+The model keeps working on the 154-token view; the full 518-token original is one call away:
+
+```jsonc
+// → sarup_retrieve(hash="caa568140bec0ff734937cf5")
+{ "content": "…the exact original text, restored byte-for-byte…" }
+```
 
 ## Install
 
