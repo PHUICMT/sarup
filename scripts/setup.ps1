@@ -52,6 +52,7 @@ if ($Pull -and (Get-Command ollama -ErrorAction SilentlyContinue)) {
     foreach ($m in @("nomic-embed-text", "gemma3:12b")) { & ollama pull $m }
 }
 if ($WithHook) { & $py (Join-Path $repo "scripts\install.py") --with-hook }
+if ($All) { & (Join-Path $repo "scripts\install-skill.ps1") }   # /sarup-setup anywhere
 
 Write-Host ""
 Write-Host "Done. Sarup is registered for all projects (restart Claude Code to load)."

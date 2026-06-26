@@ -11,10 +11,10 @@
 # unavailable and Claude keeps working normally.
 set -euo pipefail
 
-WITH_HOOK=0; PULL=0
+WITH_HOOK=0; PULL=0; ALL=0
 for a in "$@"; do
     case "$a" in
-        --all) WITH_HOOK=1; PULL=1 ;;
+        --all) WITH_HOOK=1; PULL=1; ALL=1 ;;
         --with-hook) WITH_HOOK=1 ;;
         --pull) PULL=1 ;;
     esac
@@ -55,6 +55,7 @@ if [ "$PULL" = "1" ] && command -v ollama >/dev/null 2>&1; then
     for m in nomic-embed-text gemma3:12b; do ollama pull "$m"; done
 fi
 if [ "$WITH_HOOK" = "1" ]; then "$PY" "$REPO/scripts/install.py" --with-hook; fi
+if [ "$ALL" = "1" ]; then "$REPO/scripts/install-skill.sh"; fi   # /sarup-setup anywhere
 
 echo ""
 echo "Done. Sarup is registered for all projects (restart Claude Code to load)."

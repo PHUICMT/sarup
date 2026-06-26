@@ -31,6 +31,9 @@ fi
 # 3. Remove hook + SARUP_* env from config
 [ -x "$PY" ] && "$PY" "$REPO/scripts/install.py" --uninstall || true
 
+# 3b. Remove the global /sarup-setup skill
+[ -x "$REPO/scripts/install-skill.sh" ] && "$REPO/scripts/install-skill.sh" --remove || true
+
 # 4. Purge venv + cache
 if [ "$PURGE" = "1" ]; then
     [ -d "$REPO/.venv" ] && rm -rf "$REPO/.venv" && echo "- removed .venv"

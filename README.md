@@ -179,9 +179,13 @@ The model keeps working on the 154-token view; the full 518-token original is on
 for all projects — idempotent):
 
 ```powershell
-.\scripts\setup.ps1 -All      # Windows  (-All also adds the hook + pulls Ollama models)
+.\scripts\setup.ps1 -All      # Windows  (-All also adds the hook, the /sarup-setup skill, pulls Ollama models)
 ./scripts/setup.sh --all      # Linux / WSL / macOS
 ```
+
+> Tip: `-All`/`--all` installs a global **`/sarup-setup`** skill, so on any other
+> machine you can just type `/sarup-setup` in Claude Code and it walks through the
+> install. (Or run `scripts/install-skill.ps1` / `install-skill.sh` on its own.)
 
 Uninstall just as cleanly (only removes what Sarup added; `-Purge`/`--purge` also
 deletes the venv + cache):

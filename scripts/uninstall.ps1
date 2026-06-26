@@ -34,7 +34,10 @@ if (Get-Command claude -ErrorAction SilentlyContinue) {
 # 3. Remove hook + SARUP_* env from .claude/settings.json + project .mcp.json
 if (Test-Path $py) { & $py (Join-Path $repo "scripts\install.py") --uninstall }
 
-# 4. Purge venv + cache
+# 4. Remove the global /sarup-setup skill
+& (Join-Path $repo "scripts\install-skill.ps1") -Remove
+
+# 5. Purge venv + cache
 if ($Purge) {
     if (Test-Path (Join-Path $repo ".venv")) { Remove-Item (Join-Path $repo ".venv") -Recurse -Force; Write-Host "- removed .venv" }
     if (Test-Path $db) { Remove-Item $db -Force; Write-Host "- removed cache db" }
