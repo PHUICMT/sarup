@@ -19,6 +19,8 @@ if ($Stop) {
     return
 }
 
-if (-not (Test-Path $pythonw)) { throw "pythonw.exe not found at $pythonw (run setup.ps1 first)" }
-Start-Process -FilePath $pythonw -ArgumentList "-m", "sarup.tray"
-Write-Host "sarup-tray started in background - look for the tray icon (right-click for menu)."
+$py = Join-Path $repo ".venv\Scripts\python.exe"
+if (-not (Test-Path $py)) { throw "python not found at $py (run setup.ps1 first)" }
+# The launcher self-detaches (prints starting/started, spawns the tray via pythonw,
+# then returns) — so this just runs it and the console is freed.
+& $py -m sarup.tray

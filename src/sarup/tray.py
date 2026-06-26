@@ -88,7 +88,8 @@ def main() -> None:
     import sys
     import time
 
-    if os.environ.get("SARUP_TRAY_CHILD") == "1":
+    # Direct (foreground) tray: the detached child, autostart, or `--child`.
+    if os.environ.get("SARUP_TRAY_CHILD") == "1" or "--child" in sys.argv:
         _run_tray()
         return
 

@@ -29,7 +29,7 @@ if (-not (Test-Path $pythonw)) { throw "pythonw.exe not found at $pythonw (creat
 $ws = New-Object -ComObject WScript.Shell
 $sc = $ws.CreateShortcut($lnk)
 $sc.TargetPath = $pythonw
-$sc.Arguments = "-m sarup.tray"
+$sc.Arguments = "-m sarup.tray --child"   # run the tray directly (no console, no double-spawn)
 $sc.WorkingDirectory = $repo
 $sc.WindowStyle = 7  # minimized
 $sc.Description = "Sarup compression proxy (tray)"
