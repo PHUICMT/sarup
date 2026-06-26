@@ -23,6 +23,11 @@ import threading
 from . import proxy
 
 
+_proxy_thread: threading.Thread | None = None
+_auto_unrouted = False  # True while the watchdog has cleared routing due to a dead proxy
+_last_healthy = True    # cached health for the menu (avoid blocking the UI on a probe)
+
+
 def _run_proxy() -> None:
     import uvicorn
 
@@ -30,6 +35,43 @@ def _run_proxy() -> None:
     server = uvicorn.Server(config)
     server.install_signal_handlers = lambda: None  # not the main thread
     server.run()
+
+
+def _start_proxy_thread() -> None:
+    global _proxy_thread
+    _proxy_thread = threading.Thread(target=_run_proxy, daemon=True)
+    _proxy_thread.start()
+
+
+def _watchdog() -> None:
+    """Keep the proxy alive and never let a dead proxy brick Claude Code.
+
+    Every few seconds: if the proxy is unhealthy, revive the worker thread; if it
+    still won't come back, clear routing so NEW Claude Code sessions fall back to
+    talking to the API directly (a dead localhost:PORT would otherwise hang them).
+    When the proxy recovers, routing the watchdog itself cleared is restored.
+    Already-open sessions inherit env at launch, so they're unaffected either way.
+    """
+    import time
+
+    global _auto_unrouted, _last_healthy
+    fails = 0
+    while True:
+        time.sleep(8)
+        if _proxy_healthy():
+            fails, _last_healthy = 0, True
+            if _auto_unrouted:  # proxy is back — restore the routing we cleared
+                _set_routing(True)
+                _auto_unrouted = False
+            continue
+
+        fails += 1
+        _last_healthy = False
+        if _proxy_thread is None or not _proxy_thread.is_alive():
+            _start_proxy_thread()  # worker died — respawn it (re-binds the port)
+        if fails >= 2 and _routing_on():  # still down after a grace cycle → fall back
+            _set_routing(False)
+            _auto_unrouted = True
 
 
 def _make_icon_image():
@@ -126,7 +168,8 @@ def _run_tray() -> None:
     # user explicitly set SARUP_PROXY_COMPRESS=0).
     proxy.COMPRESS_ENABLED = os.environ.get("SARUP_PROXY_COMPRESS", "1") != "0"
 
-    threading.Thread(target=_run_proxy, daemon=True).start()
+    _start_proxy_thread()
+    threading.Thread(target=_watchdog, daemon=True).start()
 
     def toggle_compress(icon, item):
         proxy.COMPRESS_ENABLED = not proxy.COMPRESS_ENABLED
@@ -138,7 +181,8 @@ def _run_tray() -> None:
         icon.stop()
 
     menu = pystray.Menu(
-        pystray.MenuItem(lambda item: f"Sarup proxy :{proxy.PORT}", None, enabled=False),
+        pystray.MenuItem(lambda item: f"Sarup proxy :{proxy.PORT}" + ("" if _last_healthy else " - DOWN"),
+                         None, enabled=False),
         pystray.MenuItem("Compression", toggle_compress, checked=lambda item: proxy.COMPRESS_ENABLED),
         pystray.MenuItem(lambda item: f"Saved: {proxy.total_saved():,} tok", None, enabled=False),
         pystray.Menu.SEPARATOR,
