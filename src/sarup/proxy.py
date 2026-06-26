@@ -31,6 +31,11 @@ from fastapi.responses import JSONResponse, Response, StreamingResponse
 UPSTREAM = os.environ.get("SARUP_PROXY_UPSTREAM", "https://api.anthropic.com").rstrip("/")
 COMPRESS_ENABLED = os.environ.get("SARUP_PROXY_COMPRESS", "0") == "1"
 PORT = int(os.environ.get("SARUP_PROXY_PORT", "8788"))
+# Hot-path defaults: offline extractive (~1ms), only big Thai blocks.
+PROXY_MODE = os.environ.get("SARUP_PROXY_MODE", "extractive")
+PROXY_MIN_CHARS = int(os.environ.get("SARUP_PROXY_MIN_CHARS", "2000"))
+
+_store = None
 
 # Headers we must not forward verbatim (hop-by-hop / recomputed by httpx).
 _DROP_REQUEST_HEADERS = {"host", "content-length", "connection", "accept-encoding"}
@@ -39,21 +44,86 @@ _DROP_RESPONSE_HEADERS = {"content-length", "content-encoding", "transfer-encodi
 app = FastAPI(title="sarup-proxy")
 
 
-def _maybe_compress_body(raw: bytes, path: str) -> bytes:
-    """Compression seam. PHASE 1: identity passthrough.
+def _get_store():
+    global _store
+    if _store is None:
+        from .store import CompressionStore
+        _store = CompressionStore(db_path=os.environ.get("SARUP_DB_PATH"))
+    return _store
 
-    PHASE 2 will, when COMPRESS_ENABLED and this is /v1/messages, parse the JSON,
-    walk `messages`, compress large Thai text blocks via sarup.compressor.compress
-    (caching originals in the store), and re-serialize. Kept verbatim for now so
-    the proxy provably changes nothing until compression is explicitly turned on.
+
+def _compress_text(text: str) -> tuple[str, int]:
+    """Compress one Thai text block; cache the original. Returns (text, tokens_saved).
+
+    No-op (returns the input) unless it's large, Thai, and actually compresses.
+    The original is cached in the SAME store the MCP server reads, so the model
+    can recover it via sarup_retrieve(hash) — that's why this is safe to be lossy.
+    """
+    from .thai import is_thai
+    from .compressor import compress
+
+    if not text or len(text) < PROXY_MIN_CHARS or not is_thai(text):
+        return text, 0
+    result = compress(text, mode=PROXY_MODE)
+    if result.tokens_saved <= 0 or result.compressed == text:
+        return text, 0
+    h = _get_store().store(text, result.compressed, result.original_tokens, result.compressed_tokens)
+    footer = (
+        f"\n\n[sarup: compressed {result.savings_percent}% "
+        f"({result.original_tokens}→{result.compressed_tokens} tok); original cached as "
+        f"hash '{h}' — call sarup_retrieve(hash='{h}') to recover full content]"
+    )
+    return result.compressed + footer, result.tokens_saved
+
+
+def _compress_message(m: dict) -> int:
+    """Compress eligible text inside one message in place. Returns tokens saved."""
+    saved = 0
+    content = m.get("content")
+    if isinstance(content, str):
+        m["content"], s = _compress_text(content)
+        return s
+    if isinstance(content, list):
+        for block in content:
+            if not isinstance(block, dict) or block.get("cache_control"):
+                continue  # never touch explicit prompt-cache anchors
+            btype = block.get("type")
+            if btype == "text" and isinstance(block.get("text"), str):
+                block["text"], s = _compress_text(block["text"])
+                saved += s
+            elif btype == "tool_result":
+                tc = block.get("content")
+                if isinstance(tc, str):
+                    block["content"], s = _compress_text(tc)
+                    saved += s
+                elif isinstance(tc, list):
+                    for tb in tc:
+                        if isinstance(tb, dict) and tb.get("type") == "text" and isinstance(tb.get("text"), str):
+                            tb["text"], s = _compress_text(tb["text"])
+                            saved += s
+    return saved
+
+
+def _maybe_compress_body(raw: bytes, path: str) -> tuple[bytes, int]:
+    """Compress large Thai blocks in older turns of a /v1/messages request.
+
+    Skips the LAST message (current turn — kept verbatim), the system prompt, and
+    any block with `cache_control` (prompt-cache anchors). Returns (body, saved).
+    Any failure returns the body unchanged — a proxy must never break the request.
     """
     if not COMPRESS_ENABLED or not path.endswith("/v1/messages"):
-        return raw
-    # --- PHASE 2 placeholder (intentionally inert until implemented & tested) ---
-    # from .compressor import compress
-    # from .store import CompressionStore
-    # data = json.loads(raw); ... compress old Thai blocks ...; return json.dumps(data).encode()
-    return raw
+        return raw, 0
+    try:
+        data = json.loads(raw)
+        msgs = data.get("messages")
+        if not isinstance(msgs, list) or len(msgs) <= 1:
+            return raw, 0
+        saved = sum(_compress_message(m) for m in msgs[:-1] if isinstance(m, dict))
+        if saved <= 0:
+            return raw, 0
+        return json.dumps(data, ensure_ascii=False).encode("utf-8"), saved
+    except Exception:
+        return raw, 0  # never break the request
 
 
 def _filter_headers(headers, drop: set[str]) -> dict[str, str]:
@@ -70,7 +140,7 @@ async def health() -> JSONResponse:
 @app.api_route("/{full_path:path}", methods=["GET", "POST", "PUT", "DELETE", "PATCH"])
 async def proxy(full_path: str, request: Request) -> Response:
     raw = await request.body()
-    raw = _maybe_compress_body(raw, "/" + full_path)
+    raw, saved = _maybe_compress_body(raw, "/" + full_path)
 
     url = f"{UPSTREAM}/{full_path}"
     if request.url.query:
@@ -92,19 +162,23 @@ async def proxy(full_path: str, request: Request) -> Response:
                 await upstream.aclose()
                 await client.aclose()
 
+        resp_headers = _filter_headers(upstream.headers, _DROP_RESPONSE_HEADERS)
+        resp_headers["x-sarup-tokens-saved"] = str(saved)
         return StreamingResponse(
             body_iter(),
             status_code=upstream.status_code,
-            headers=_filter_headers(upstream.headers, _DROP_RESPONSE_HEADERS),
+            headers=resp_headers,
             media_type=upstream.headers.get("content-type"),
         )
 
     try:
         upstream = await client.request(request.method, url, headers=fwd_headers, content=raw)
+        resp_headers = _filter_headers(upstream.headers, _DROP_RESPONSE_HEADERS)
+        resp_headers["x-sarup-tokens-saved"] = str(saved)
         return Response(
             content=upstream.content,
             status_code=upstream.status_code,
-            headers=_filter_headers(upstream.headers, _DROP_RESPONSE_HEADERS),
+            headers=resp_headers,
             media_type=upstream.headers.get("content-type"),
         )
     finally:

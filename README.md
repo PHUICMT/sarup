@@ -29,6 +29,7 @@ Shrink the text you feed an LLM by **50–88%** — while the original stays **1
 - [Measured results](#measured-results)
 - [Install](#install)
 - [Register with Claude Code](#register-with-claude-code)
+- [Auto-compression: API proxy](#auto-compression-api-proxy-headroom-style)
 - [Auto-compression hook](#auto-compression-hook)
 - [Configuration](#configuration)
 - [Project structure](#project-structure)
@@ -185,6 +186,38 @@ Or run it directly over stdio:
 ```powershell
 .\.venv\Scripts\python.exe -m sarup.server
 ```
+
+## Auto-compression: API proxy (Headroom-style)
+
+The real hands-off path — compress at the API boundary, independent of hooks.
+`sarup-proxy` is an Anthropic Messages API middleware: point any client at it via
+`ANTHROPIC_BASE_URL` and it forwards every request to `api.anthropic.com`, compressing
+large Thai blocks in **older turns** on the way through (the current turn, the system
+prompt, and `cache_control` anchors are left untouched). Originals are cached in the same
+store, so `sarup_retrieve(hash)` recovers them. Each response carries an
+`x-sarup-tokens-saved` header.
+
+```powershell
+pip install -e ".[proxy]"
+
+# terminal 1 — start the proxy (compression on, shared store)
+$env:SARUP_PROXY_COMPRESS="1"; $env:SARUP_DB_PATH="…\.sarup-cache.db"; sarup-proxy
+
+# terminal 2 — route Claude Code through it (scoped to this shell; close to revert)
+$env:ANTHROPIC_BASE_URL="http://localhost:8788"; claude
+```
+
+| Var | Default | Meaning |
+|-----|---------|---------|
+| `SARUP_PROXY_COMPRESS` | `0` | `1` enables compression (else pure passthrough) |
+| `SARUP_PROXY_MODE` | `extractive` | Compression mode (extractive is offline & fast — best for the hot path) |
+| `SARUP_PROXY_MIN_CHARS` | `2000` | Only compress blocks larger than this |
+| `SARUP_PROXY_PORT` | `8788` | Listen port |
+| `SARUP_PROXY_UPSTREAM` | `https://api.anthropic.com` | Real API base |
+
+> Trade-off: compressing history changes the request prefix, which can reduce Anthropic
+> prompt-cache hits. It skips `cache_control` anchors to limit this. Start with
+> `SARUP_PROXY_COMPRESS=0` (passthrough) to confirm nothing breaks, then enable.
 
 ## Auto-compression hook
 
