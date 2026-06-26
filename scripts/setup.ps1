@@ -52,6 +52,7 @@ if ($Pull -and (Get-Command ollama -ErrorAction SilentlyContinue)) {
 }
 if ($WithHook) { & $py (Join-Path $repo "scripts\install.py") --with-hook }
 if ($Autostart) { & (Join-Path $repo "scripts\install-autostart.ps1") }
+if ($All) { & (Join-Path $repo "scripts\install-command.ps1") }   # start-tray anywhere
 
 Write-Host ""
 Write-Host "Done. Sarup is registered for all projects (restart Claude Code to load)."

@@ -248,6 +248,14 @@ pip install -e ".[tray]"
 (`sarup-tray` runs in the foreground and blocks the terminal — use `start-tray.ps1`,
 or `.\scripts\start-tray.ps1 -Stop` to stop it.)
 
+For a global command you can type from **any directory** (added to your PowerShell
+profile by `setup.ps1 -All`, or run `.\scripts\install-command.ps1` directly):
+
+```powershell
+start-tray      # launch the tray in the background, from anywhere
+stop-tray       # stop it
+```
+
 The tray's proxy runs offline (extractive) — **it does not depend on Ollama**, which
 can start later or never. Routing Claude Code through it is an explicit toggle in the
 tray menu, so autostart alone changes nothing until you opt in.

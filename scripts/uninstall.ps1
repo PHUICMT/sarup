@@ -32,8 +32,9 @@ if (Get-Command claude -ErrorAction SilentlyContinue) {
 # 3. Remove hook + SARUP_* env from .claude/settings.json + project .mcp.json
 if (Test-Path $py) { & $py (Join-Path $repo "scripts\install.py") --uninstall }
 
-# 4. Remove autostart shortcut
+# 4. Remove autostart shortcut + profile commands
 & (Join-Path $repo "scripts\install-autostart.ps1") -Remove
+& (Join-Path $repo "scripts\install-command.ps1") -Remove
 
 # 5. Purge venv + cache
 if ($Purge) {
