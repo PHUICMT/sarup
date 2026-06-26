@@ -151,7 +151,10 @@ def main() -> None:
         kwargs["creationflags"] = subprocess.DETACHED_PROCESS | subprocess.CREATE_NEW_PROCESS_GROUP
     else:
         kwargs["start_new_session"] = True
-    subprocess.Popen([launcher, "-m", "sarup.tray"], **kwargs)
+    # Pass --child as an argv (not just the env flag): on some Windows setups the
+    # env doesn't propagate through a DETACHED_PROCESS Popen, so the child would
+    # re-launch itself and you'd get two trays. argv always survives.
+    subprocess.Popen([launcher, "-m", "sarup.tray", "--child"], **kwargs)
 
     for _ in range(20):  # wait up to ~5s for the proxy to answer
         if _proxy_healthy():
@@ -164,12 +167,41 @@ def main() -> None:
 def _run_tray() -> None:
     import pystray
 
+    # Single-instance gate: the port is the mutex. If we can't bind it, another
+    # tray already owns it — exit now instead of running a dud icon that shows 0
+    # saved (it could never bind to serve traffic anyway). Closing immediately
+    # hands the port to uvicorn below with only a negligible race.
+    import socket
+
+    probe = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    try:
+        probe.bind(("127.0.0.1", proxy.PORT))
+    except OSError:
+        print(f"Sarup tray: already running (proxy on :{proxy.PORT}); not starting a second.")
+        return
+    finally:
+        probe.close()
+
     # The tray exists to auto-compress, so default compression ON (unless the
     # user explicitly set SARUP_PROXY_COMPRESS=0).
     proxy.COMPRESS_ENABLED = os.environ.get("SARUP_PROXY_COMPRESS", "1") != "0"
 
     _start_proxy_thread()
     threading.Thread(target=_watchdog, daemon=True).start()
+
+    # Routing is OPT-IN: the tray never forces ANTHROPIC_BASE_URL on its own, so a
+    # running tray can't brick Claude Code if the proxy is unhealthy. Enable with
+    # SARUP_TRAY_AUTOROUTE=1, or just click "Route Claude Code" in the menu.
+    if os.environ.get("SARUP_TRAY_AUTOROUTE", "0") == "1":
+        def _autoroute() -> None:
+            import time
+            for _ in range(40):  # wait up to ~10s for the proxy to bind
+                if _proxy_healthy():
+                    if not _routing_on():
+                        _set_routing(True)
+                    return
+                time.sleep(0.25)
+        threading.Thread(target=_autoroute, daemon=True).start()
 
     def toggle_compress(icon, item):
         proxy.COMPRESS_ENABLED = not proxy.COMPRESS_ENABLED
@@ -189,7 +221,29 @@ def _run_tray() -> None:
         pystray.MenuItem("Route Claude Code", _toggle_routing, checked=lambda item: _routing_on()),
         pystray.MenuItem("Quit (stops proxy + unroutes)", quit_tray),
     )
-    pystray.Icon("sarup", _make_icon_image(), "Sarup proxy", menu).run()
+    icon = pystray.Icon("sarup", _make_icon_image(), "Sarup proxy", menu)
+
+    def _refresh(icon) -> None:
+        # Live-update the tooltip + re-render the menu so "Saved" tracks traffic in
+        # near-real-time (the tooltip refreshes on hover; the menu, when reopened).
+        import time
+
+        while True:
+            try:
+                icon.title = (
+                    f"Sarup proxy :{proxy.PORT} - {proxy.total_saved():,} tok saved"
+                    if _last_healthy else f"Sarup proxy :{proxy.PORT} - DOWN"
+                )
+                icon.update_menu()
+            except Exception:
+                pass
+            time.sleep(3)
+
+    def setup(icon) -> None:
+        icon.visible = True
+        threading.Thread(target=_refresh, args=(icon,), daemon=True).start()
+
+    icon.run(setup=setup)
 
 
 if __name__ == "__main__":
