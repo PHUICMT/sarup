@@ -256,10 +256,12 @@ Skip manual tool calls entirely: install the **PostToolUse hook** and large `Rea
 outputs are compressed before they enter context, with the original cached for retrieval.
 Source-code reads are skipped for safety. Full setup in **[hooks/README.md](hooks/README.md)**.
 
-> **Requires Claude Code ≥ 2.1.186**, which is when `PostToolUse` began applying a
-> hook's `updatedToolOutput` (earlier builds ran the hook but ignored the substitution).
-> Replace `<SARUP_DIR>` with your clone path — or just run `install.py --with-hook`, which
-> writes this for you.
+> **Experimental — verify on your build.** The hook fires and emits a valid
+> `updatedToolOutput`, but whether Claude Code *applies* it is surface-dependent: as of
+> testing, the **VS Code extension (2.1.193) does NOT apply it** — the model still receives
+> the full output, so the hook is a no-op there. Use the manual `sarup_compress` tool
+> instead (it works everywhere); the hook may apply on other/CLI builds.
+> Replace `<SARUP_DIR>` with your clone path, or run `install.py --with-hook`.
 
 ```json
 {

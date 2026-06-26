@@ -6,11 +6,13 @@ Compress large tool outputs **automatically** — no need for the model to call
 (`updatedToolOutput`), and caches the original so `sarup_retrieve(hash)` still
 recovers it byte-for-byte.
 
-> **Requires Claude Code ≥ 2.1.186.** That release is when `PostToolUse` started
-> applying a hook's `updatedToolOutput` (the docs describe it
-> [here](https://code.claude.com/docs/en/hooks)); earlier builds invoked the hook but
-> ignored the substitution. On a supported build the compressed output replaces the
-> original in context. The manual `sarup_compress` tool works on any version.
+> **Experimental — verify on your build.** The hook is invoked and emits a valid
+> `updatedToolOutput`, but *applying* it is surface-dependent: as of testing the **VS Code
+> extension (2.1.193) does not apply it** (verified live — the model still receives the full
+> output), so it's a no-op there. The Claude Code
+> [hooks docs](https://code.claude.com/docs/en/hooks) describe `updatedToolOutput` as
+> replacing the result, so it may work on other/CLI builds. The manual `sarup_compress`
+> tool works everywhere.
 
 ## How it stays 100% accurate
 

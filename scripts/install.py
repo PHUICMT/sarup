@@ -244,7 +244,7 @@ def main() -> None:
             print("(The MCP server should be registered once at user scope: `claude mcp add ... -s user`.)")
             return
         py = venv_python()
-        db = str(REPO / ".sarup-cache.db")
+        db = str(Path.home() / ".sarup-cache.db")
         hook = str(REPO / "hooks" / "sarup_hook.py")
         rec = recommend(ollama_models())
         env = {"SARUP_DB_PATH": db, "SARUP_HOOK_MODE": rec["hook_mode"]}
