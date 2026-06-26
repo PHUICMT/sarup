@@ -214,7 +214,7 @@ async def proxy(full_path: str, request: Request) -> Response:
 def main() -> None:
     import uvicorn
 
-    print(f"sarup-proxy → {UPSTREAM}  (compress={COMPRESS_ENABLED}, port={PORT})")
+    print(f"sarup-proxy -> {UPSTREAM}  (compress={COMPRESS_ENABLED}, port={PORT})")
     print(f"Point your client at:  ANTHROPIC_BASE_URL=http://localhost:{PORT}")
     uvicorn.run(app, host="127.0.0.1", port=PORT, log_level="warning")
 
