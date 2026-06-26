@@ -2,15 +2,16 @@
 One-command Sarup setup (Windows). Idempotent - safe to re-run.
 
     .\scripts\setup.ps1            # venv + install + register MCP (user scope)
-    .\scripts\setup.ps1 -All       # also: auto-compress hook, tray autostart, pull models
-    .\scripts\setup.ps1 -WithHook -Autostart -Pull   # pick individually
+    .\scripts\setup.ps1 -All       # also: auto-compress hook + pull Ollama models
+    .\scripts\setup.ps1 -WithHook -Pull   # pick individually
 
-After it finishes:
-    sarup-tray                     # background proxy + tray (then "Route Claude Code")
-    .\scripts\sarup-claude.ps1     # or: one-shot proxy+claude for a single session
+Sarup is an MCP server: register it once and every Claude Code project can call
+sarup_compress / sarup_retrieve / sarup_stats. It never sits in the API path, so
+it can never break Claude Code - if the server is down the tools are simply
+unavailable and Claude keeps working normally.
 #>
-param([switch]$WithHook, [switch]$Autostart, [switch]$Pull, [switch]$All)
-if ($All) { $WithHook = $true; $Autostart = $true; $Pull = $true }
+param([switch]$WithHook, [switch]$Pull, [switch]$All)
+if ($All) { $WithHook = $true; $Pull = $true }
 $ErrorActionPreference = "Stop"
 
 $repo = Split-Path -Parent $PSScriptRoot
@@ -29,10 +30,10 @@ if (-not (Test-Path $py)) {
 }
 else { Write-Host "[1/4] .venv exists." }
 
-# 2. install (the [tray] extra pulls proxy + tray + everything)
+# 2. install
 Write-Host "[2/4] Installing sarup + deps..."
 & $py -m pip install -q --upgrade pip
-& $py -m pip install -q -e "$repo[tray]"
+& $py -m pip install -q -e "$repo"
 
 # 3. register MCP at user scope (all projects). Use claude if available.
 Write-Host "[3/4] Registering 'sarup' MCP (user scope)..."
@@ -51,12 +52,10 @@ if ($Pull -and (Get-Command ollama -ErrorAction SilentlyContinue)) {
     foreach ($m in @("nomic-embed-text", "gemma3:12b")) { & ollama pull $m }
 }
 if ($WithHook) { & $py (Join-Path $repo "scripts\install.py") --with-hook }
-if ($Autostart) { & (Join-Path $repo "scripts\install-autostart.ps1") }
-if ($All) { & (Join-Path $repo "scripts\install-command.ps1") }   # start-tray anywhere
 
 Write-Host ""
 Write-Host "Done. Sarup is registered for all projects (restart Claude Code to load)."
-Write-Host "Use it:"
-Write-Host "  - manual:  sarup_compress(content, mode='auto')   (in any Claude Code session)"
-Write-Host "  - auto:    sarup-tray   ->  tray menu  ->  'Route Claude Code'"
-Write-Host "  - one-shot: .\scripts\sarup-claude.ps1"
+Write-Host "Use it in any Claude Code session:"
+Write-Host "  sarup_compress(content, mode='auto')   # compress (lossy view + lossless store)"
+Write-Host "  sarup_retrieve(hash='...')             # recover the original byte-for-byte"
+Write-Host "  sarup_stats()                          # session savings"

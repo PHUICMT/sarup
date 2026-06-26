@@ -5,8 +5,10 @@
 #   ./scripts/setup.sh --all      # also: auto-compress hook + pull Ollama models
 #   ./scripts/setup.sh --with-hook --pull
 #
-# After it finishes:
-#   ./scripts/sarup-claude.sh     # one-shot proxy + claude for a session
+# Sarup is an MCP server: register it once and every Claude Code project can call
+# sarup_compress / sarup_retrieve / sarup_stats. It never sits in the API path, so
+# it can never break Claude Code — if the server is down the tools are simply
+# unavailable and Claude keeps working normally.
 set -euo pipefail
 
 WITH_HOOK=0; PULL=0
@@ -31,10 +33,10 @@ else
     echo "[1/4] .venv exists."
 fi
 
-# 2. install (tray extra = proxy + tray + everything)
+# 2. install
 echo "[2/4] Installing sarup + deps..."
 "$PY" -m pip install -q --upgrade pip
-"$PY" -m pip install -q -e "$REPO[tray]"
+"$PY" -m pip install -q -e "$REPO"
 
 # 3. register MCP at user scope
 echo "[3/4] Registering 'sarup' MCP (user scope)..."
@@ -56,6 +58,7 @@ if [ "$WITH_HOOK" = "1" ]; then "$PY" "$REPO/scripts/install.py" --with-hook; fi
 
 echo ""
 echo "Done. Sarup is registered for all projects (restart Claude Code to load)."
-echo "Use it:"
-echo "  - manual:  sarup_compress(content, mode='auto')"
-echo "  - one-shot auto:  ./scripts/sarup-claude.sh"
+echo "Use it in any Claude Code session:"
+echo "  sarup_compress(content, mode='auto')   # compress (lossy view + lossless store)"
+echo "  sarup_retrieve(hash='...')             # recover the original byte-for-byte"
+echo "  sarup_stats()                          # session savings"

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Clean uninstall of Sarup's footprint (Linux / WSL / macOS). Idempotent.
 #
-#   ./scripts/uninstall.sh            # remove MCP reg, hook, routing
+#   ./scripts/uninstall.sh            # remove MCP registration + hook
 #   ./scripts/uninstall.sh --purge    # also delete .venv and the cache db
 #
 # Removes only what Sarup added. The repo is left in place. The Sarup section in
@@ -15,9 +15,9 @@ REPO="$(cd "$(dirname "$0")/.." && pwd)"
 PY="$REPO/.venv/bin/python"
 DB="$HOME/.sarup-cache.db"
 
-# 1. Stop routing if it points at a local proxy (ours)
+# 1. Legacy cleanup: older Sarup versions shipped an ANTHROPIC_BASE_URL proxy.
 case "${ANTHROPIC_BASE_URL:-}" in
-    http://localhost:*|http://127.0.0.1:*) unset ANTHROPIC_BASE_URL; echo "- unrouted (unset ANTHROPIC_BASE_URL for this shell; remove from your profile if set there)";;
+    http://localhost:*|http://127.0.0.1:*) unset ANTHROPIC_BASE_URL; echo "- cleared legacy ANTHROPIC_BASE_URL for this shell; remove it from your profile if set there";;
 esac
 
 # 2. Unregister MCP (user + project)

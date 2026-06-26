@@ -1,18 +1,5 @@
 <div align="center">
 
-# 🗜️ Sarup (สรุป)
-
-**Thai-first context compression for Claude Code.**
-Shrink the text you feed an LLM by **50–88%** — while the original stays **100% recoverable, byte-for-byte**.
-
-[![Python](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org)
-[![MCP](https://img.shields.io/badge/MCP-server-8A2BE2.svg)](https://modelcontextprotocol.io)
-[![tests](https://github.com/PHUICMT/sarup/actions/workflows/ci.yml/badge.svg)](https://github.com/PHUICMT/sarup/actions/workflows/ci.yml)
-[![Offline](https://img.shields.io/badge/works-offline-success.svg)](#install)
-[![License](https://img.shields.io/badge/license-MIT-lightgrey.svg)](#license)
-
-</div>
-
 ---
 
 > *สรุป* means "to summarize." Headroom routes Thai through `noop` (0% savings) because its
@@ -22,18 +9,17 @@ Shrink the text you feed an LLM by **50–88%** — while the original stays **1
 ## Contents
 
 - [Highlights](#highlights)
-- [Why it's safe — the two-tier guarantee](#why-its-safe--the-two-tier-guarantee)
+- [Why it&#39;s safe — the two-tier guarantee](#why-its-safe--the-two-tier-guarantee)
 - [How it works](#how-it-works)
 - [Tools](#tools)
 - [Compression modes](#compression-modes)
 - [Measured results](#measured-results)
 - [Install](#install)
 - [Register with Claude Code](#register-with-claude-code)
-- [Auto-compression: API proxy](#auto-compression-api-proxy-headroom-style)
 - [Auto-compression hook](#auto-compression-hook)
 - [Configuration](#configuration)
 - [Project structure](#project-structure)
-- [Tech stack & techniques](#tech-stack--techniques)
+- [Tech stack &amp; techniques](#tech-stack--techniques)
 - [Testing](#testing)
 - [Roadmap](#roadmap)
 - [License](#license)
@@ -44,15 +30,15 @@ Shrink the text you feed an LLM by **50–88%** — while the original stays **1
 - ♻️ **Lossless by guarantee** — every compress caches the original; `verified: true` proves a byte-for-byte round-trip.
 - 🎚️ **Five modes** — from offline 1 ms TF-IDF to an 88%-savings cascade.
 - 🧠 **Optional local LLM** — embeddings + rewrite via Ollama, with automatic offline fallback.
-- ⚙️ **Auto mode** — a PostToolUse hook compresses large tool outputs with zero manual calls.
 - 📏 **Honest metrics** — token counts from a real tokenizer (tiktoken), not byte guesses.
-- 🔌 **Routing** — JSON compaction, log dedup, and verbatim code-fence preservation built in.
+- 🔌 **Content-aware** — JSON compaction, log dedup, and verbatim code-fence preservation built in.
+- 🛟 **Can't break Claude** — it's an MCP tool, not an API proxy; if the server is down the tools just go away and Claude keeps working.
 
 ## Why it's safe — the two-tier guarantee
 
-| Tier | What | Guarantee |
-|------|------|-----------|
-| **Compressed view** | the shrunk text the model works on | lossy · small · cheap |
+| Tier                      | What                                 | Guarantee               |
+| ------------------------- | ------------------------------------ | ----------------------- |
+| **Compressed view** | the shrunk text the model works on   | lossy · small · cheap |
 | **Retrieval store** | the original, keyed by a stable hash | lossless · recoverable |
 
 Aggressive lossy compression is safe *because* the original is always one `sarup_retrieve(hash)`
@@ -89,31 +75,31 @@ flowchart TD
 
 ## Tools
 
-| Tool | Purpose |
-|------|---------|
-| `sarup_compress(content, target_ratio?, lossless?, query?, mode?)` | Compress; returns compressed text, hash, token metrics, `verified`, `token_method`. |
-| `sarup_retrieve(hash)` | Recover the original content byte-for-byte. |
-| `sarup_stats()` | Cumulative session savings. |
+| Tool                                                                 | Purpose                                                                                |
+| -------------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
+| `sarup_compress(content, target_ratio?, lossless?, query?, mode?)` | Compress; returns compressed text, hash, token metrics,`verified`, `token_method`. |
+| `sarup_retrieve(hash)`                                             | Recover the original content byte-for-byte.                                            |
+| `sarup_stats()`                                                    | Cumulative session savings.                                                            |
 
 **`sarup_compress` arguments**
 
-| Arg | Type | Default | Meaning |
-|-----|------|---------|---------|
-| `content` | string | — | Text to compress (required). |
-| `target_ratio` | number | `0.5` | Fraction of prose to keep (0.1–0.9). |
-| `lossless` | boolean | `false` | Only apply lossless transforms (whitespace / JSON compact). |
-| `query` | string | `""` | Relevance hint — sentences matching it are kept. |
-| `mode` | string | `extractive` | See modes below. |
+| Arg              | Type    | Default        | Meaning                                                     |
+| ---------------- | ------- | -------------- | ----------------------------------------------------------- |
+| `content`      | string  | —             | Text to compress (required).                                |
+| `target_ratio` | number  | `0.5`        | Fraction of prose to keep (0.1–0.9).                       |
+| `lossless`     | boolean | `false`      | Only apply lossless transforms (whitespace / JSON compact). |
+| `query`        | string  | `""`         | Relevance hint — sentences matching it are kept.           |
+| `mode`         | string  | `extractive` | See modes below.                                            |
 
 ## Compression modes
 
-| Mode | How | Needs Ollama | Savings¹ | Speed¹ | Output |
-|------|-----|:---:|:---:|:---:|--------|
-| `extractive` *(default)* | TF-IDF scoring + n-gram dedup | no | 50.8% | ~1 ms | verbatim subset |
-| `semantic` | Embedding centrality + cosine dedup | yes | 64.6% | ~1–2 s | verbatim subset |
-| `abstractive` | Local-LLM rewrite | yes | ~51% | ~8–20 s | paraphrased |
-| `pipeline` | Cascade: semantic → abstractive | yes | **88.1%** | ~2 s | paraphrased |
-| `auto` | semantic if Ollama is up, else extractive | optional | 64.6% | ~90 ms | subset |
+| Mode                         | How                                       | Needs Ollama |    Savings¹    | Speed¹ | Output          |
+| ---------------------------- | ----------------------------------------- | :----------: | :-------------: | :------: | --------------- |
+| `extractive` *(default)* | TF-IDF scoring + n-gram dedup             |      no      |      50.8%      |  ~1 ms  | verbatim subset |
+| `semantic`                 | Embedding centrality + cosine dedup       |     yes     |      64.6%      | ~1–2 s | verbatim subset |
+| `abstractive`              | Local-LLM rewrite                         |     yes     |      ~51%      | ~8–20 s | paraphrased     |
+| `pipeline`                 | Cascade: semantic → abstractive          |     yes     | **88.1%** |   ~2 s   | paraphrased     |
+| `auto`                     | semantic if Ollama is up, else extractive |   optional   |      64.6%      |  ~90 ms  | subset          |
 
 ¹ Measured on a 10-sentence Thai paragraph (522 tokens). Every mode stays 100% recoverable via the
 store; Ollama modes **degrade gracefully** to extractive when the backend is down.
@@ -144,7 +130,7 @@ Token counts via tiktoken `cl100k_base` — a real tokenizer, not a byte heurist
 for all projects — idempotent):
 
 ```powershell
-.\scripts\setup.ps1 -All      # Windows  (-All also adds the hook, tray autostart, pulls models)
+.\scripts\setup.ps1 -All      # Windows  (-All also adds the hook + pulls Ollama models)
 ./scripts/setup.sh --all      # Linux / WSL / macOS
 ```
 
@@ -162,6 +148,7 @@ deletes the venv + cache):
 py -3.11 -m venv .venv
 .\.venv\Scripts\python.exe -m pip install -e ".[dev]"
 ```
+
 </details>
 
 Optional local-LLM modes (`semantic` / `abstractive` / `pipeline`) need [Ollama](https://ollama.com):
@@ -206,73 +193,6 @@ Or run it directly over stdio:
 .\.venv\Scripts\python.exe -m sarup.server
 ```
 
-## Auto-compression: API proxy (Headroom-style)
-
-The real hands-off path — compress at the API boundary, independent of hooks.
-`sarup-proxy` is an Anthropic Messages API middleware: point any client at it via
-`ANTHROPIC_BASE_URL` and it forwards every request to `api.anthropic.com`, compressing
-large Thai blocks in **older turns** on the way through (the current turn, the system
-prompt, and `cache_control` anchors are left untouched). Originals are cached in the same
-store, so `sarup_retrieve(hash)` recovers them. Each response carries an
-`x-sarup-tokens-saved` header.
-
-```powershell
-pip install -e ".[proxy]"
-
-# terminal 1 — start the proxy (compression on, shared store)
-$env:SARUP_PROXY_COMPRESS="1"; $env:SARUP_DB_PATH="…\.sarup-cache.db"; sarup-proxy
-
-# terminal 2 — route Claude Code through it (scoped to this shell; close to revert)
-$env:ANTHROPIC_BASE_URL="http://localhost:8788"; claude
-```
-
-Or one command (starts the proxy, waits for health, launches Claude through it, and
-stops the proxy on exit):
-
-```powershell
-.\scripts\sarup-claude.ps1          # Windows
-./scripts/sarup-claude.sh           # Linux / WSL / macOS
-```
-
-### Always-on (system tray + autostart)
-
-Run the proxy quietly in the background with a tray icon (compression toggle,
-cumulative tokens saved, Claude Code routing toggle, quit):
-
-```powershell
-pip install -e ".[tray]"
-.\scripts\start-tray.ps1                # run now in the background (terminal returns)
-.\scripts\install-autostart.ps1         # start on every login (-Remove to undo)
-```
-
-(`sarup-tray` runs in the foreground and blocks the terminal — use `start-tray.ps1`,
-or `.\scripts\start-tray.ps1 -Stop` to stop it.)
-
-For a global command you can type from **any directory** (added to your PowerShell
-profile by `setup.ps1 -All`, or run `.\scripts\install-command.ps1` directly):
-
-```powershell
-start-tray      # launch the tray in the background, from anywhere
-stop-tray       # stop it
-```
-
-The tray's proxy runs offline (extractive) — **it does not depend on Ollama**, which
-can start later or never. Routing Claude Code through it is an explicit toggle in the
-tray menu, so autostart alone changes nothing until you opt in.
-
-| Var | Default | Meaning |
-|-----|---------|---------|
-| `SARUP_PROXY_COMPRESS` | `0` | `1` enables compression (else pure passthrough) |
-| `SARUP_PROXY_MODE` | `extractive` | Compression mode (extractive is offline & fast — best for the hot path) |
-| `SARUP_PROXY_MIN_CHARS` | `2000` | Only compress blocks larger than this |
-| `SARUP_PROXY_KEEP_RECENT` | `4` | Keep the last N messages verbatim (prompt-cache settle window — higher = more cache-safe, fewer savings) |
-| `SARUP_PROXY_PORT` | `8788` | Listen port |
-| `SARUP_PROXY_UPSTREAM` | `https://api.anthropic.com` | Real API base |
-
-> Trade-off: compressing history changes the request prefix, which can reduce Anthropic
-> prompt-cache hits. It skips `cache_control` anchors to limit this. Start with
-> `SARUP_PROXY_COMPRESS=0` (passthrough) to confirm nothing breaks, then enable.
-
 ## Auto-compression hook
 
 Skip manual tool calls entirely: install the **PostToolUse hook** and large `Read`/`Bash`/`Grep`
@@ -314,14 +234,14 @@ the cache on restart, and the hook will not substitute — see the hook docs).
 
 ## Configuration
 
-| Var | Default | Meaning |
-|-----|---------|---------|
-| `SARUP_DB_PATH` | *(in-memory)* | SQLite path for a persistent, cross-process store. **Required** for hook retrieval. |
-| `OLLAMA_HOST` | `http://localhost:11434` | Ollama endpoint. |
-| `SARUP_ABSTRACTIVE_MODEL` | `gemma3:12b` | Model for abstractive / pipeline rewrite. |
-| `SARUP_EMBED_MODEL` | `nomic-embed-text` | Model for semantic embeddings. |
-| `SARUP_HOOK_MODE` | `auto` | Hook compression mode. |
-| `SARUP_HOOK_MIN_CHARS` | `4000` | Hook only compresses outputs larger than this. |
+| Var                         | Default                    | Meaning                                                                                  |
+| --------------------------- | -------------------------- | ---------------------------------------------------------------------------------------- |
+| `SARUP_DB_PATH`           | *(in-memory)*            | SQLite path for a persistent, cross-process store.**Required** for hook retrieval. |
+| `OLLAMA_HOST`             | `http://localhost:11434` | Ollama endpoint.                                                                         |
+| `SARUP_ABSTRACTIVE_MODEL` | `gemma3:12b`             | Model for abstractive / pipeline rewrite.                                                |
+| `SARUP_EMBED_MODEL`       | `nomic-embed-text`       | Model for semantic embeddings.                                                           |
+| `SARUP_HOOK_MODE`         | `auto`                   | Hook compression mode.                                                                   |
+| `SARUP_HOOK_MIN_CHARS`    | `4000`                   | Hook only compresses outputs larger than this.                                           |
 
 ## Project structure
 
@@ -339,7 +259,7 @@ sarup/
 │   ├── sarup_hook.py   # PostToolUse auto-compression hook
 │   └── README.md       # hook install guide
 ├── bench/benchmark.py  # before/after measurement
-├── tests/              # 50 tests (test_thai, test_mcp, test_hook)
+├── tests/              # test_thai, test_mcp, test_hook, ...
 ├── README.md
 └── STACK.md            # full stack + techniques
 ```
@@ -357,7 +277,7 @@ routing, and graceful degradation — is documented in **[STACK.md](STACK.md)**.
 .\.venv\Scripts\python.exe -m pytest tests/ -q
 ```
 
-50 tests cover Thai NLP, the MCP tool contracts, every mode (including Ollama-fallback paths), the
+The suite covers Thai NLP, the MCP tool contracts, every mode (including Ollama-fallback paths), the
 roundtrip-verify guarantee, and the auto-compression hook (incl. cross-process retrieval).
 
 ## Roadmap
