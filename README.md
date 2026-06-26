@@ -7,7 +7,7 @@ Shrink the text you feed an LLM by **50–88%** — while the original stays **1
 
 [![Python](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org)
 [![MCP](https://img.shields.io/badge/MCP-server-8A2BE2.svg)](https://modelcontextprotocol.io)
-[![Tests](https://img.shields.io/badge/tests-50%20passing-brightgreen.svg)](tests/)
+[![tests](https://github.com/PHUICMT/sarup/actions/workflows/ci.yml/badge.svg)](https://github.com/PHUICMT/sarup/actions/workflows/ci.yml)
 [![Offline](https://img.shields.io/badge/works-offline-success.svg)](#install)
 [![License](https://img.shields.io/badge/license-MIT-lightgrey.svg)](#license)
 
