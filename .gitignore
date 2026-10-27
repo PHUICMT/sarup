@@ -20,6 +20,9 @@ venv/
 .claude/
 *.bak.*
 
+# Per-question eval output (bench/eval_qa.py --out)
+bench/eval-*.json
+
 # Test / tooling caches
 .pytest_cache/
 .ruff_cache/
