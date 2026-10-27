@@ -8,6 +8,7 @@ An MCP server that actually shrinks Thai (50–78% fewer tokens) and caches ever
 so nothing is ever lost. Measured for what matters too: whether Claude still answers correctly.
 
 [![CI](https://github.com/PHUICMT/sarup/actions/workflows/ci.yml/badge.svg)](https://github.com/PHUICMT/sarup/actions/workflows/ci.yml)
+&nbsp;[![PyPI](https://img.shields.io/pypi/v/sarup.svg)](https://pypi.org/project/sarup/)
 &nbsp;![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)
 &nbsp;![Python](https://img.shields.io/badge/python-3.11%2B-blue.svg)
 &nbsp;![MCP](https://img.shields.io/badge/MCP-server-8A2BE2.svg)
@@ -248,6 +249,27 @@ Ollama is optional. Without it everything works offline: the hook and the defaul
 falls back to extractive with a `setup` field that names what to install. `sarup_stats`
 shows what is available, and `/sarup:sarup-setup` walks through adding
 [Ollama](https://ollama.com) and the models below.
+
+### From PyPI (any MCP client)
+
+The package is [`sarup` on PyPI](https://pypi.org/project/sarup/). With uv, nothing to install
+by hand; point any MCP client at `uvx sarup`:
+
+```json
+{
+  "mcpServers": {
+    "sarup": {
+      "command": "uvx",
+      "args": ["sarup"],
+      "env": { "SARUP_DB_PATH": "/home/me/.sarup-cache.db" }
+    }
+  }
+}
+```
+
+In Claude Code without the plugin: `claude mcp add sarup -s user -- uvx sarup`. The hook is
+`uvx --from sarup sarup-hook --db <same file as SARUP_DB_PATH>`. `pip install sarup` works
+too and puts `sarup` and `sarup-hook` on PATH.
 
 ### From a clone
 
