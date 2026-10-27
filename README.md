@@ -1,3 +1,4 @@
+<!-- mcp-name: io.github.PHUICMT/sarup -->
 <div align="center">
 
 # สรุป · Sarup
@@ -424,6 +425,17 @@ Quality is measured separately, since it needs a model: `bench\eval_qa.py` (see
 [Does Claude still get it right?](#does-claude-still-get-it-right)). It runs on the local
 `claude` CLI by default, or `--backend api` with an Anthropic API key; `--dry-run` and
 `--limit` keep a check cheap; a full run is ~170 Claude calls.
+
+## Releasing
+
+1. Bump `version` in `pyproject.toml` and `server.json` (both places in it).
+2. Push a matching tag: `git tag v0.2.0 && git push origin v0.2.0`. The `publish` workflow
+   tests, builds and uploads to PyPI through trusted publishing (no token).
+3. List the release in the MCP registry: `mcp-publisher login github`, then
+   `mcp-publisher publish` (reads `server.json`; the `mcp-name` comment at the top of
+   this README proves the PyPI package belongs to it).
+
+The plugin needs none of this: it installs from the repo and updates with each commit.
 
 ## Roadmap
 

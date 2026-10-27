@@ -4,16 +4,33 @@ build-backend = "hatchling.build"
 
 [project]
 name = "sarup"
-version = "0.1.0"
+version = "0.2.0"
 description = "Thai-first context compression MCP server for Claude Code"
+readme = "README.md"
 requires-python = ">=3.11"
 license = { text = "MIT" }
+authors = [{ name = "PHUCHANNN", email = "icmtchannel@gmail.com" }]
+keywords = ["thai", "compression", "mcp", "context", "tokens", "pythainlp"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "License :: OSI Approved :: MIT License",
+    "Natural Language :: Thai",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Text Processing :: Linguistic",
+]
 dependencies = [
     "mcp>=1.9.0,<2",
     "pythainlp>=5.0.0",
     "python-crfsuite>=0.9.10",  # pythainlp's default Thai sentence splitter (crfcut)
     "tiktoken>=0.7.0",
 ]
+
+[project.urls]
+Homepage = "https://github.com/PHUICMT/sarup"
+Repository = "https://github.com/PHUICMT/sarup"
+Issues = "https://github.com/PHUICMT/sarup/issues"
 
 [project.optional-dependencies]
 llm = ["anthropic>=0.40.0"]
