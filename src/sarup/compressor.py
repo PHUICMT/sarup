@@ -8,7 +8,7 @@ from dataclasses import dataclass, field
 
 from .thai import is_thai, tfidf_compress, PYTHAINLP_AVAILABLE
 from .tokens import count_tokens
-from .llm import generate as _llm_generate, ABSTRACTIVE_MODEL
+from .llm import generate as _llm_generate, abstractive_model
 from .semantic import semantic_compress
 
 # Compression modes for the prose path.
@@ -196,7 +196,7 @@ def _compress_abstractive(text: str, target_ratio: float) -> tuple[str, list[str
     # and isn't pathologically short.
     if count_tokens(out) >= count_tokens(text) or len(out) < len(text) * 0.05:
         return None
-    return out, ["abstractive_llm", f"model:{ABSTRACTIVE_MODEL}"]
+    return out, ["abstractive_llm", f"model:{abstractive_model()}"]
 
 
 def _semantic_try(text: str, target_ratio: float, query: str) -> tuple[str, list[str]] | None:

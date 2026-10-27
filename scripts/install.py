@@ -41,7 +41,8 @@ REPO = Path(__file__).resolve().parent.parent
 OLLAMA_HOST = os.environ.get("OLLAMA_HOST", "http://localhost:11434").rstrip("/")
 
 # Preference order when choosing a generation model for abstractive/pipeline.
-_GEN_PREFS = ["gemma3:12b", "gemma3", "gemma4:12b", "gemma4", "qwen3:8b", "qwen3"]
+# Keep in step with sarup.llm.GEN_PREFS (this script runs before the package is installed).
+_GEN_PREFS = ["gemma4:e4b", "gemma4:12b", "gemma4", "gemma3:12b", "gemma3", "qwen3:8b", "qwen3"]
 _EMBED_PREFS = ["nomic-embed-text", "bge-m3", "mxbai-embed-large"]
 
 
@@ -283,7 +284,7 @@ def main() -> None:
         print("  ollama: not running → offline 'extractive' mode (still works fully)")
 
     if args.pull and rec["ollama"]:
-        for want, have in (("nomic-embed-text", rec["embed"]), ("gemma3:12b", rec["gen"])):
+        for want, have in (("nomic-embed-text", rec["embed"]), (_GEN_PREFS[0], rec["gen"])):
             if not have:
                 print(f"  - pulling {want} ...")
                 subprocess.run(["ollama", "pull", want], check=False)

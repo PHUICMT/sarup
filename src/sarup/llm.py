@@ -18,14 +18,15 @@ import urllib.request
 
 OLLAMA_HOST = os.environ.get("OLLAMA_HOST", "http://localhost:11434").rstrip("/")
 
-# Default abstractive model. Gemma 3 12B is SCB10X's own validated base for
-# Thai (best size-to-performance, doesn't "overthink" the way Qwen3 does) and
-# runs on a 12GB GPU. Typhoon2.1 would be ideal but its current GGUF chat
-# template crashes llama-server in recent Ollama. Alternatives: qwen3:8b (fast,
-# disable thinking), gemma4. Override with SARUP_ABSTRACTIVE_MODEL.
-# NOTE: abstractive is the slowest mode (~10-20s/doc); 'semantic' usually gives
-# a higher ratio far faster — prefer it for everyday use.
-ABSTRACTIVE_MODEL = os.environ.get("SARUP_ABSTRACTIVE_MODEL", "gemma3:12b")
+# Abstractive model: SARUP_ABSTRACTIVE_MODEL if set, else the first of these
+# that is installed. Gemma 4 with thinking off scored 91% on the Thai QA eval
+# (bench/eval_qa.py, Oct 2026) in both sizes; e4b is first because it needs far
+# less VRAM. Gemma 3 12B is SCB10X's validated Thai base. Typhoon2.1 would be
+# ideal but its GGUF chat template crashes llama-server in recent Ollama.
+# NOTE: abstractive is the slowest mode (~8-12s/doc), so not for the hook.
+GEN_PREFS = ["gemma4:e4b", "gemma4:12b", "gemma4", "gemma3:12b", "gemma3", "qwen3:8b", "qwen3"]
+ABSTRACTIVE_MODEL = os.environ.get("SARUP_ABSTRACTIVE_MODEL") or GEN_PREFS[0]
+_resolved_model: str | None = None
 EMBED_MODEL = os.environ.get("SARUP_EMBED_MODEL", "nomic-embed-text")
 
 # Short connect timeout for the availability probe; longer for generation.
@@ -66,9 +67,31 @@ def list_models(timeout: float = _PROBE_TIMEOUT) -> list[str]:
         return []
 
 
+def pick_model(installed: list[str], prefs: list[str]) -> str | None:
+    """First preference that matches an installed model name (tag optional)."""
+    for p in prefs:
+        for m in installed:
+            if m == p or m.startswith(p + ":") or m.split(":")[0] == p:
+                return m
+    return None
+
+
+def abstractive_model() -> str:
+    """The rewrite model: the env override, else the best installed, else the default."""
+    global _resolved_model
+    if os.environ.get("SARUP_ABSTRACTIVE_MODEL"):
+        return ABSTRACTIVE_MODEL
+    if _resolved_model is None:
+        installed = list_models()
+        if not installed:
+            return ABSTRACTIVE_MODEL  # Ollama down: don't cache, retry next call
+        _resolved_model = pick_model(installed, GEN_PREFS) or ABSTRACTIVE_MODEL
+    return _resolved_model
+
+
 def generate(prompt: str, model: str | None = None, timeout: float = _GEN_TIMEOUT) -> str | None:
     """Run a one-shot generation. Returns None on any failure (caller falls back)."""
-    model = model or ABSTRACTIVE_MODEL
+    model = model or abstractive_model()
     try:
         out = _post(
             "/api/generate",
@@ -76,6 +99,9 @@ def generate(prompt: str, model: str | None = None, timeout: float = _GEN_TIMEOU
                 "model": model,
                 "prompt": prompt,
                 "stream": False,
+                # gemma4/qwen3 think by default: 3-4x slower for no gain on a
+                # rewrite. Models without thinking ignore the flag.
+                "think": False,
                 "options": {"temperature": 0.0, "top_p": 0.9},
             },
             timeout=timeout,

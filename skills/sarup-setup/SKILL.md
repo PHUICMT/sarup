@@ -30,7 +30,7 @@ From the repo root:
 - **Linux / WSL / macOS:** `./scripts/setup.sh --all`
 
 `-All` / `--all` also pulls the optional Ollama models (`nomic-embed-text`,
-`gemma3:12b`) for the higher-ratio `semantic` / `pipeline` modes. Drop the flag for
+`gemma4:e4b`) for the higher-ratio `semantic` / `pipeline` modes. Drop the flag for
 a minimal MCP-only install (offline `extractive` mode still works with no Ollama).
 
 If the scripts can't run, do it manually with the repo's venv python:
