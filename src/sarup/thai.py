@@ -22,10 +22,44 @@ _SENT_SPLIT_RE = re.compile(
     r"|[\n\r]{2,}"             # blank lines
 )
 
-# Thai clause connectors — used to sub-split very long sentences
+# Thai clause connectors, used to sub-split very long sentences. Zero-width, so
+# the connector stays at the head of its clause and the text stays verbatim.
 _THAI_CONNECTORS = re.compile(
-    r"(?<=\s)(และ|หรือ|แต่|เพราะ|จึง|ดังนั้น|อย่างไรก็ตาม|นอกจากนี้|ทั้งนี้|โดย)\s"
+    r"(?<=\s)(?=(?:และ|หรือ|แต่|เพราะ|จึง|ดังนั้น|อย่างไรก็ตาม|นอกจากนี้|ทั้งนี้|โดย)\s)"
 )
+
+# Marks where extractive compression dropped sentences. Without it, a nearby
+# surviving fact can pass for the answer (eval: "5 years → how many days?"
+# answered "12" because the "15" sentence was gone). With it, the reader knows
+# something is missing and retrieves the original instead.
+GAP_MARKER = "[…]"
+
+# Specific facts: numbers (Arabic or Thai digits) and Latin identifiers such as
+# X-Api-Key or PostgreSQL. These are what questions ask about, so sentences
+# carrying them outrank general statements of the same TF-IDF weight.
+_FACT_RE = re.compile(r"[0-9๐-๙]+(?:[.,:/][0-9๐-๙]+)*|[A-Za-z][\w.\-]*")
+_FACT_BOOST = 0.35
+_FACT_BOOST_CAP = 3
+
+
+def fact_boost(sentence: str) -> float:
+    """Score multiplier for a sentence by how many specific facts it carries."""
+    return 1.0 + _FACT_BOOST * min(len(_FACT_RE.findall(sentence)), _FACT_BOOST_CAP)
+
+
+def join_kept(sentences: list[str], kept: list[int]) -> str:
+    """Rejoin kept sentences in order, with GAP_MARKER wherever some were dropped."""
+    out: list[str] = []
+    prev = -1
+    for i in sorted(kept):
+        if i != prev + 1:
+            out.append(GAP_MARKER)
+        out.append(sentences[i])
+        prev = i
+    if prev != len(sentences) - 1:
+        out.append(GAP_MARKER)
+    return "\n".join(out)
+
 
 # Stop-words to ignore in scoring (Thai + English)
 _THAI_STOPWORDS: set[str] = {
@@ -76,7 +110,7 @@ def split_sentences(text: str) -> list[str]:
                 for s in sents:
                     if len(s) > 120:
                         parts = _THAI_CONNECTORS.split(s)
-                        result.extend(p.strip() for p in parts if p.strip() and len(p.strip()) > 5)
+                        result.extend(p.strip() for p in parts if p.strip())
                     else:
                         if s.strip():
                             result.append(s.strip())
@@ -122,7 +156,8 @@ def tfidf_compress(
         near_dup_threshold: Jaccard threshold above which to drop duplicates.
 
     Returns:
-        Compressed text (subset of original sentences, joined by newlines).
+        Compressed text: original sentences joined by newlines, with GAP_MARKER
+        where sentences were dropped.
     """
     sentences = split_sentences(text)
 
@@ -153,7 +188,7 @@ def tfidf_compress(
 
     # Score each sentence
     scores: list[float] = []
-    for tokens in tokenized:
+    for sentence, tokens in zip(sentences, tokenized):
         if not tokens:
             scores.append(0.0)
             continue
@@ -173,7 +208,7 @@ def tfidf_compress(
             score += tfidf
 
         # Normalize by sentence length to avoid bias toward long sentences
-        scores.append(score / math.sqrt(len(tokens)))
+        scores.append(score / math.sqrt(len(tokens)) * fact_boost(sentence))
 
     # Position bias: first and last sentences are often important
     if N >= 4:
@@ -202,6 +237,4 @@ def tfidf_compress(
             kept_indices.append(idx)
             kept_tokens.append(tokens)
 
-    # Reconstruct in original order
-    kept_indices.sort()
-    return "\n".join(sentences[i] for i in kept_indices)
+    return join_kept(sentences, kept_indices)

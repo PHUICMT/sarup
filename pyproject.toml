@@ -11,6 +11,7 @@ license = { text = "MIT" }
 dependencies = [
     "mcp>=1.9.0,<2",
     "pythainlp>=5.0.0",
+    "python-crfsuite>=0.9.10",  # pythainlp's default Thai sentence splitter (crfcut)
     "tiktoken>=0.7.0",
 ]
 

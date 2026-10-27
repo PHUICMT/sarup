@@ -11,7 +11,16 @@ import pytest
 
 from sarup.compressor import compress, estimate_tokens
 from sarup.store import CompressionStore
-from sarup.thai import is_thai, split_sentences, tfidf_compress, tokenize_words
+from sarup.thai import (
+    _THAI_CONNECTORS,
+    GAP_MARKER,
+    fact_boost,
+    is_thai,
+    join_kept,
+    split_sentences,
+    tfidf_compress,
+    tokenize_words,
+)
 
 # ─── Thai detection ────────────────────────────────────────────────────────────
 
@@ -57,6 +66,45 @@ def test_split_sentences_english():
     text = "First sentence.\nSecond sentence.\nThird one."
     sents = split_sentences(text)
     assert len(sents) >= 2
+
+
+THAI_PARAGRAPH = (
+    "พนักงานประจำมีสิทธิ์ลาพักร้อนได้ปีละ 12 วันทำงาน โดยเริ่มนับสิทธิ์หลังผ่านการทดลองงาน 119 วัน "
+    "วันลาพักร้อนที่ใช้ไม่หมดสามารถสะสมไปปีถัดไปได้ไม่เกิน 6 วัน ส่วนที่เกินจะถูกตัดทิ้งเมื่อสิ้นปี "
+    "การลาพักร้อนต้องยื่นคำขอผ่านระบบ HR ล่วงหน้าอย่างน้อย 7 วัน และต้องได้รับอนุมัติจากหัวหน้างานโดยตรง "
+    "สำหรับการลาป่วย พนักงานลาได้โดยได้รับค่าจ้างไม่เกิน 30 วันต่อปี "
+    "หากลาป่วยติดต่อกันตั้งแต่ 3 วันขึ้นไปต้องแนบใบรับรองแพทย์"
+)
+
+
+def test_split_thai_paragraph_without_newlines():
+    # Real Thai prose rarely breaks lines; it needs the crfcut model
+    # (python-crfsuite). Without it everything collapsed into one "sentence".
+    assert len(split_sentences(THAI_PARAGRAPH)) >= 5
+
+
+def test_clause_split_keeps_connectors_attached():
+    # Sub-splitting long sentences must not drop "และ" or leave "อย่างไรก็ตาม" alone.
+    text = "ระบบล่มไปสองชั่วโมง และ ทีมแก้ไขเสร็จตอนเช้า อย่างไรก็ตาม ลูกค้ายังไม่พอใจ"
+    parts = [p.strip() for p in _THAI_CONNECTORS.split(text) if p.strip()]
+    assert parts == ["ระบบล่มไปสองชั่วโมง", "และ ทีมแก้ไขเสร็จตอนเช้า", "อย่างไรก็ตาม ลูกค้ายังไม่พอใจ"]
+
+
+def test_thai_paragraph_compresses():
+    assert compress(THAI_PARAGRAPH, target_ratio=0.5).savings_percent >= 20.0
+
+
+def test_join_kept_marks_every_gap():
+    sents = ["a", "b", "c", "d", "e"]
+    assert join_kept(sents, [1, 2, 4]).splitlines() == [GAP_MARKER, "b", "c", GAP_MARKER, "e"]
+    assert join_kept(sents, [0, 1]).splitlines() == ["a", "b", GAP_MARKER]
+    assert GAP_MARKER not in join_kept(sents, [0, 1, 2, 3, 4])
+
+
+def test_fact_boost_prefers_specifics():
+    assert fact_boost("ทีมจะพยายามลดค่าใช้จ่าย") == 1.0
+    assert fact_boost("จำกัดไว้ที่ 120 requests ต่อนาที") > 1.0
+    assert fact_boost("๑๒๐ ครั้ง") > 1.0
 
 
 # ─── TF-IDF compression ───────────────────────────────────────────────────────
@@ -111,7 +159,8 @@ def test_compressed_is_subset_of_original():
     """Extractive: every line in output must appear verbatim in input."""
     result = compress(THAI_PROSE, target_ratio=0.5)
     original_lines = set(THAI_PROSE.splitlines())
-    compressed_lines = [ln for ln in result.compressed.splitlines() if ln.strip()]
+    compressed_lines = [ln for ln in result.compressed.splitlines()
+                        if ln.strip() and ln != GAP_MARKER]
     for line in compressed_lines:
         assert line in original_lines, (
             f"Non-original line in compressed output: {line!r}"

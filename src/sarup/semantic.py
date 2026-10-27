@@ -18,7 +18,7 @@ import math
 from typing import Optional
 
 from .llm import embed
-from .thai import split_sentences
+from .thai import fact_boost, join_kept, split_sentences
 
 # Centrality + dedup are O(N²) in sentence count. Above this, fall back to the
 # linear TF-IDF path instead of pinning CPU/RAM on a pathological input.
@@ -70,7 +70,7 @@ def semantic_compress(
         centrality = sum(sims) / len(sims) if sims else 0.0
         if query_vec is not None:
             centrality += 1.5 * _cosine(sent_vecs[i], query_vec)  # relevance boost
-        scores.append(centrality)
+        scores.append(centrality * fact_boost(sentences[i]))
 
     # Position bias — first/last often carry framing.
     scores[0] = max(scores[0], max(scores) * 0.85)
@@ -88,5 +88,4 @@ def semantic_compress(
             continue
         kept.append(idx)
 
-    kept.sort()
-    return "\n".join(sentences[i] for i in kept)
+    return join_kept(sentences, kept)

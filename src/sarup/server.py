@@ -190,7 +190,8 @@ class SarupServer:
 
         if result.tokens_saved > 0:
             payload["note"] = (
-                f"Original cached under hash '{h}'. "
+                f"Original cached under hash '{h}'. […] marks omitted text; a fact "
+                f"you need may be there, not in the lines nearby. "
                 f"Call {RETRIEVE_TOOL}(hash='{h}') to recover full content."
             )
 

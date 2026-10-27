@@ -126,6 +126,7 @@ def build_hook_output(payload: dict) -> dict | None:
         f"\n\n[sarup: auto-compressed {result.savings_percent}% "
         f"({result.original_tokens}→{result.compressed_tokens} tok). "
         f"Original cached as hash '{h}'. "
+        f"[…] marks omitted text; a fact you need may be there, not in the lines nearby. "
         f"Call sarup_retrieve(hash='{h}') for full content if needed.]"
     )
     return {
