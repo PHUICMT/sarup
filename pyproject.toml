@@ -9,7 +9,7 @@ description = "Thai-first context compression MCP server for Claude Code"
 requires-python = ">=3.11"
 license = { text = "MIT" }
 dependencies = [
-    "mcp>=1.9.0",
+    "mcp>=1.9.0,<2",
     "pythainlp>=5.0.0",
     "tiktoken>=0.7.0",
 ]
