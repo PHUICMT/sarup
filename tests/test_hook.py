@@ -116,6 +116,23 @@ def test_updated_output_keeps_each_tools_shape():
     assert sarup_hook._replace_output("long", "short") == "short"
 
 
+def test_main_reads_utf8_stdin_whatever_the_locale(monkeypatch, tmp_path, capsys):
+    # Windows hands the hook a cp1252 stdin; the payload bytes are UTF-8.
+    import io
+    import sys
+
+    payload = json.dumps(_bash(BIG_THAI), ensure_ascii=False).encode("utf-8")
+    monkeypatch.setattr(sys, "stdin", io.TextIOWrapper(io.BytesIO(payload), encoding="cp1252"))
+    monkeypatch.setattr(sys, "argv", ["sarup-hook", "--db", str(tmp_path / "c.db")])
+    monkeypatch.delenv("SARUP_DB_PATH", raising=False)
+    monkeypatch.setattr(sarup_hook, "MIN_TOKENS", 100)
+    with pytest.raises(SystemExit):
+        sarup_hook.main()
+    out = json.loads(capsys.readouterr().out)
+    h = out["hookSpecificOutput"]["updatedToolOutput"]["stdout"].split("hash '")[1].split("'")[0]
+    assert CompressionStore(db_path=str(tmp_path / "c.db")).retrieve(h) == BIG_THAI
+
+
 def test_no_db_path_skips_substitution(monkeypatch):
     """Without a shared store, the original is unrecoverable → never substitute."""
     monkeypatch.delenv("SARUP_DB_PATH", raising=False)

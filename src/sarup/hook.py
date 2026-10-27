@@ -190,7 +190,11 @@ def main() -> None:
         os.environ["SARUP_DB_PATH"] = args[args.index("--db") + 1]
 
     try:
-        payload = json.load(sys.stdin)
+        # The host writes UTF-8. On Windows sys.stdin decodes with the locale
+        # code page (cp1252), which turned every Thai character into three
+        # Latin-1 ones: the hook compressed and cached mojibake. Decode the
+        # bytes ourselves.
+        payload = json.loads(sys.stdin.buffer.read().decode("utf-8", "replace"))
     except Exception:
         sys.exit(0)  # malformed input → leave the tool result untouched
 
