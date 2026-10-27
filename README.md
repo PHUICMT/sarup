@@ -466,7 +466,8 @@ The plugin needs none of this: it installs from the repo and updates with each c
 - [ ] Move to `mcp` 2.x (pinned `<2` for now: 2.x dropped `Server.list_tools`).
 - [ ] Optional Typhoon 2.1 abstractive (blocked on an Ollama template fix).
 - [ ] Per-content adaptive `target_ratio`.
-- [ ] Published PyPI package.
+- [x] Published PyPI package ([`sarup`](https://pypi.org/project/sarup/)) and MCP registry listing (`io.github.PHUICMT/sarup`).
+- [x] Installable as a Claude Code plugin.
 
 ## License
 
