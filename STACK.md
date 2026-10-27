@@ -13,7 +13,7 @@ What Sarup is built from, and the technique behind each part.
 | Thai sentences | PyThaiNLP `crfcut` + `python-crfsuite` | Dense Thai paragraphs have no sentence punctuation |
 | Local LLM (optional) | [Ollama](https://ollama.com) via stdlib `urllib` | Embeddings + abstractive rewrite, fully offline, no extra dep |
 | Embeddings | `nomic-embed-text` | Semantic sentence scoring & dedup |
-| Abstractive model | best installed of `gemma4:e4b` → `gemma4:12b` → `gemma3:12b` → `qwen3` | 91% on the Thai QA eval (gemma4, thinking off); `SARUP_ABSTRACTIVE_MODEL` overrides |
+| Abstractive model | best installed of `gemma4:12b` → `gemma4:e4b` → `gemma3:12b` → `qwen3` | 91% on the Thai QA eval (gemma4, thinking off); `SARUP_ABSTRACTIVE_MODEL` overrides |
 | Storage | in-memory dict + optional SQLite | CCR (compress-and-cache-retrieval) original store |
 | Hash | SHA-256, first 24 hex chars | Deterministic, stable content key |
 | Build | hatchling | Simple PEP 621 packaging |
@@ -102,7 +102,7 @@ Every compress call runs `store.verify(hash, original)` and reports
 ### 4. Pipeline (Ollama, maximum savings)
 - **Cascade**: stage 1 selects the most representative sentences (semantic, or
   TF-IDF if embeddings are down); stage 2 abstractively rewrites the survivors.
-- Each stage feeds the next → 82% on Thai prose with `gemma4:e4b` (522→93
+- Each stage feeds the next → 78% on Thai prose with `gemma4:12b` (522→114
   tokens; 88% with `gemma3:12b` in June 2026).
 - Lossy view, but still fully recoverable: the original is cached before any
   stage runs.
@@ -138,7 +138,8 @@ offline; Ollama only raises the ceiling.
 the compressed view only (full table in the README).
 - The June gemma4 numbers were thinking-on runs. With `think: false`, gemma4 is
   3–4× faster and compresses 44–52% → **gemma4 is now first** in the model
-  preference (`e4b`, then `12b`; both scored 91% on abstractive).
+  preference (`12b`, then `e4b`; both scored 91% on abstractive, and 12b is the
+  smaller download at 7.6 GB vs 9.6 GB).
 - **Abstractive keeps the most facts per token** (91% correct at 42% saved vs
   extractive's 69% at 30%): a rewrite keeps every number and drops words, while
   extraction can only drop whole sentences.

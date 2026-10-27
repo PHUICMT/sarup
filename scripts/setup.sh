@@ -52,7 +52,7 @@ fi
 # 4. optional extras
 echo "[4/4] Optional extras..."
 if [ "$PULL" = "1" ] && command -v ollama >/dev/null 2>&1; then
-    for m in nomic-embed-text gemma4:e4b; do ollama pull "$m"; done
+    for m in nomic-embed-text gemma4:12b; do ollama pull "$m"; done
 fi
 if [ "$WITH_HOOK" = "1" ]; then "$PY" "$REPO/scripts/install.py" --with-hook; fi
 if [ "$ALL" = "1" ]; then "$REPO/scripts/install-skill.sh"; fi   # /sarup-setup anywhere

@@ -21,11 +21,12 @@ OLLAMA_HOST = os.environ.get("OLLAMA_HOST", "http://localhost:11434").rstrip("/"
 
 # Abstractive model: SARUP_ABSTRACTIVE_MODEL if set, else the first of these
 # that is installed. Gemma 4 with thinking off scored 91% on the Thai QA eval
-# (bench/eval_qa.py, Oct 2026) in both sizes; e4b is first because it needs far
-# less VRAM. Gemma 3 12B is SCB10X's validated Thai base. Typhoon2.1 would be
-# ideal but its GGUF chat template crashes llama-server in recent Ollama.
+# (bench/eval_qa.py, Oct 2026) in both sizes; 12b is first because it is the
+# smaller download (7.6 GB vs e4b's 9.6 GB) and rewrites faster (~8 s vs ~12 s).
+# Gemma 3 12B is SCB10X's validated Thai base. Typhoon2.1 would be ideal but
+# its GGUF chat template crashes llama-server in recent Ollama.
 # NOTE: abstractive is the slowest mode (~8-12s/doc), so not for the hook.
-GEN_PREFS = ["gemma4:e4b", "gemma4:12b", "gemma4", "gemma3:12b", "gemma3", "qwen3:8b", "qwen3"]
+GEN_PREFS = ["gemma4:12b", "gemma4:e4b", "gemma4", "gemma3:12b", "gemma3", "qwen3:8b", "qwen3"]
 ABSTRACTIVE_MODEL = os.environ.get("SARUP_ABSTRACTIVE_MODEL") or GEN_PREFS[0]
 _resolved_model: str | None = None
 EMBED_MODEL = os.environ.get("SARUP_EMBED_MODEL", "nomic-embed-text")
@@ -108,6 +109,48 @@ def abstractive_model() -> str:
             return ABSTRACTIVE_MODEL  # Ollama down: don't cache, retry next call
         _resolved_model = pick_model(installed, GEN_PREFS) or ABSTRACTIVE_MODEL
     return _resolved_model
+
+
+def backend_status() -> dict:
+    """What the Ollama-backed modes can use right now."""
+    installed = list_models()
+    override = os.environ.get("SARUP_ABSTRACTIVE_MODEL")
+    rewrite = (override if override in installed else None) if override else pick_model(installed, GEN_PREFS)
+    return {
+        "ollama": bool(installed) or ollama_available(),
+        "embed_model": pick_model(installed, [EMBED_MODEL]),
+        "rewrite_model": rewrite,
+    }
+
+
+_NEEDS = {
+    "semantic": ("embed",),
+    "abstractive": ("rewrite",),
+    "pipeline": ("embed", "rewrite"),
+}
+
+
+def setup_hint(mode: str) -> str | None:
+    """How to get `mode` working, or None if nothing it needs is missing.
+
+    'auto' is left out on purpose: falling back to extractive is what it promises.
+    """
+    needs = _NEEDS.get(mode)
+    if not needs:
+        return None
+    status = backend_status()
+    pulls = []
+    if "embed" in needs and not status["embed_model"]:
+        pulls.append(f"ollama pull {EMBED_MODEL}")
+    if "rewrite" in needs and not status["rewrite_model"]:
+        pulls.append(f"ollama pull {os.environ.get('SARUP_ABSTRACTIVE_MODEL') or GEN_PREFS[0]}")
+    if not pulls:
+        return None
+    if not status["ollama"]:
+        return (f"Mode '{mode}' needs Ollama, which isn't running here, so extractive ran "
+                f"instead. Install it from https://ollama.com, start it, then run: "
+                + "; ".join(pulls))
+    return f"Mode '{mode}' fell back to extractive: Ollama is missing a model. Run: " + "; ".join(pulls)
 
 
 def generate(prompt: str, model: str | None = None, timeout: float = _GEN_TIMEOUT) -> str | None:

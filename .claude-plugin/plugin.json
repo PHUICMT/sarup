@@ -1,6 +1,6 @@
 {
   "name": "sarup",
-  "description": "Thai-first context compression: shrinks large tool outputs (Thai and English) and keeps every original one sarup_retrieve away.",
+  "description": "Thai-first context compression: shrinks large tool outputs (Thai and English) and keeps every original one sarup_retrieve away. Needs uv; Ollama is optional (run /sarup:sarup-setup).",
   "author": {
     "name": "PHUCHANNN",
     "url": "https://github.com/PHUICMT"

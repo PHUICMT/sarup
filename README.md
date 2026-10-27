@@ -3,7 +3,7 @@
 # สรุป · Sarup
 
 **Thai-first context compression for Claude Code.**
-An MCP server that actually shrinks Thai (50–82% fewer tokens) and caches every original
+An MCP server that actually shrinks Thai (50–78% fewer tokens) and caches every original
 so nothing is ever lost. Measured for what matters too: whether Claude still answers correctly.
 
 [![CI](https://github.com/PHUICMT/sarup/actions/workflows/ci.yml/badge.svg)](https://github.com/PHUICMT/sarup/actions/workflows/ci.yml)
@@ -50,7 +50,7 @@ Quickstart demo GIF goes here. To record one:
 
 - 🇹🇭 **Real Thai compression** — PyThaiNLP `newmm` word segmentation, not whitespace.
 - ♻️ **Lossless by guarantee** — every compress caches the original; `verified: true` proves a byte-for-byte round-trip.
-- 🎚️ **Five modes**: from offline 1 ms TF-IDF to an 82%-savings cascade.
+- 🎚️ **Five modes**: from offline 1 ms TF-IDF to a 78%-savings cascade.
 - 🧠 **Optional local LLM** — embeddings + rewrite via Ollama, with automatic offline fallback.
 - 📏 **Honest metrics**: a real tokenizer (tiktoken) at runtime; Claude's own tokenizer and a
   Thai QA eval for the published numbers ([Does Claude still get it right?](#does-claude-still-get-it-right)).
@@ -80,7 +80,7 @@ flowchart TD
     A["⚙️ Automatic<br/>PostToolUse hook<br/>(Read · Bash · Grep)"]:::entry --> R
 
     R{"Sarup compress<br/>extractive · semantic · abstractive · pipeline"}:::engine
-    R -- "compressed view<br/>50–82% fewer tokens" --> V["📄 Model context"]:::lossy
+    R -- "compressed view<br/>50–78% fewer tokens" --> V["📄 Model context"]:::lossy
     R -. "cache original" .-> S[("🗄️ Retrieval store<br/>hash → original")]:::lossless
 
     V -. "need full detail?" .-> RET["🔑 sarup_retrieve(hash)"]:::lossless
@@ -122,13 +122,13 @@ flowchart TD
 | ---------------------------- | ----------------------------------------- | :----------: | :-------------: | :------: | --------------- |
 | `extractive` *(default)* | TF-IDF scoring + fact boost + n-gram dedup |      no      |      52.7%      |  ~1 ms  | verbatim subset |
 | `semantic`                 | Embedding centrality + cosine dedup       |     yes     |      63.8%      | ~2 s | verbatim subset |
-| `abstractive`              | Local-LLM rewrite                         |     yes     |      51.7%      | ~3–12 s | paraphrased     |
-| `pipeline`                 | Cascade: semantic → abstractive          |     yes     | **82.2%** |  ~5 s   | paraphrased     |
+| `abstractive`              | Local-LLM rewrite                         |     yes     |      44.4%      |  ~8 s   | paraphrased     |
+| `pipeline`                 | Cascade: semantic → abstractive          |     yes     | **78.2%** |  ~6 s   | paraphrased     |
 | `auto`                     | semantic if Ollama is up, else extractive |   optional   |      63.8%      |  ~2 s  | subset          |
 
-¹ Measured on a 10-sentence Thai paragraph (522 tokens), rewrite model `gemma4:e4b`. Every mode
+¹ Measured on a 10-sentence Thai paragraph (522 tokens), rewrite model `gemma4:12b`. Every mode
 stays 100% recoverable via the store; Ollama modes **degrade gracefully** to extractive when the
-backend is down. (June 2026, `gemma3:12b`: pipeline 88.1%.)
+backend is down. (`gemma4:e4b`: pipeline 82.2%; June 2026, `gemma3:12b`: 88.1%.)
 
 Extractive and semantic output is a verbatim subset of the input sentences, with `[…]` on its
 own line wherever sentences were dropped. Sentences carrying specifics (numbers, Thai digits,
@@ -150,7 +150,7 @@ TOTAL                         1779     840    52.8%    ALL OK   → 100% recover
 
 Mode comparison (Thai prose, 522 tok):
   extractive 52.7% (1ms) · semantic 63.8% (2.1s) · auto 63.8% (2.1s)
-  abstractive 51.7% (2.7s) · pipeline 82.2% (4.5s)      ← gemma4:e4b
+  abstractive 44.4% (8.3s) · pipeline 78.2% (5.8s)      ← gemma4:12b
 ```
 
 Token counts via tiktoken `cl100k_base`. That is OpenAI's tokenizer and undercounts Claude,
@@ -244,8 +244,9 @@ takes a few seconds while `uvx` builds the environment. From a shell instead:
 
 Ollama is optional. Without it everything works offline: the hook and the default
 `extractive` mode never touch it, and asking for `semantic`, `abstractive` or `pipeline`
-quietly falls back to extractive (the result's `transforms` say which ran). Install
-[Ollama](https://ollama.com) and the models below only if you want those modes.
+falls back to extractive with a `setup` field that names what to install. `sarup_stats`
+shows what is available, and `/sarup:sarup-setup` walks through adding
+[Ollama](https://ollama.com) and the models below.
 
 ### From a clone
 
@@ -282,7 +283,7 @@ Optional local-LLM modes (`semantic` / `abstractive` / `pipeline`) need [Ollama]
 
 ```powershell
 ollama pull nomic-embed-text     # embeddings → semantic mode
-ollama pull gemma4:e4b           # rewrite → abstractive / pipeline (or gemma4:12b / gemma3:12b)
+ollama pull gemma4:12b           # rewrite → abstractive / pipeline, 7.6 GB (or gemma4:e4b / gemma3:12b)
 ```
 
 ## Register with Claude Code
@@ -297,7 +298,7 @@ ollama pull gemma4:e4b           # rewrite → abstractive / pipeline (or gemma4
 
 - No Ollama? It configures offline `extractive` mode — still fully works.
 - Ollama up? It auto-selects `nomic-embed-text` (semantic) + the best installed rewrite model
-  (`gemma4:e4b` → `gemma4:12b` → `gemma3:12b` → `qwen3`) for `sarup_compress`.
+  (`gemma4:12b` → `gemma4:e4b` → `gemma3:12b` → `qwen3`) for `sarup_compress`.
   The hook stays `extractive` either way (it runs on every tool call). `--pull` fetches
   any missing models.
 - Idempotent — safe to re-run; `--global` writes to `~/.claude` instead.
@@ -376,7 +377,7 @@ the cache on restart, and the hook will not substitute — see the hook docs).
 | --------------------------- | -------------------------- | ---------------------------------------------------------------------------------------- |
 | `SARUP_DB_PATH`           | *(in-memory)*            | SQLite path for a persistent, cross-process store.**Required** for hook retrieval. |
 | `OLLAMA_HOST`             | `http://localhost:11434` | Ollama endpoint.                                                                         |
-| `SARUP_ABSTRACTIVE_MODEL` | best installed           | Model for abstractive / pipeline rewrite. Unset: first installed of `gemma4:e4b`, `gemma4:12b`, `gemma3:12b`, `qwen3`. |
+| `SARUP_ABSTRACTIVE_MODEL` | best installed           | Model for abstractive / pipeline rewrite. Unset: first installed of `gemma4:12b`, `gemma4:e4b`, `gemma3:12b`, `qwen3`. |
 | `SARUP_EMBED_MODEL`       | `nomic-embed-text`       | Model for semantic embeddings.                                                           |
 | `SARUP_HOOK_MODE`         | `extractive`             | Hook compression mode. `auto`/`semantic` need Ollama and cost ~2 s per tool call.        |
 | `SARUP_HOOK_MIN_TOKENS`   | `400`                    | Hook only compresses outputs with at least this many tokens (token-based, fair across languages). |

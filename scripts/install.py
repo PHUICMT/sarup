@@ -42,7 +42,7 @@ OLLAMA_HOST = os.environ.get("OLLAMA_HOST", "http://localhost:11434").rstrip("/"
 
 # Preference order when choosing a generation model for abstractive/pipeline.
 # Keep in step with sarup.llm.GEN_PREFS (this script runs before the package is installed).
-_GEN_PREFS = ["gemma4:e4b", "gemma4:12b", "gemma4", "gemma3:12b", "gemma3", "qwen3:8b", "qwen3"]
+_GEN_PREFS = ["gemma4:12b", "gemma4:e4b", "gemma4", "gemma3:12b", "gemma3", "qwen3:8b", "qwen3"]
 _EMBED_PREFS = ["nomic-embed-text", "bge-m3", "mxbai-embed-large"]
 
 

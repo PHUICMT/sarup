@@ -1,79 +1,87 @@
 ---
 name: sarup-setup
-description: Install, register, or verify the Sarup Thai-compression MCP server for Claude Code. Use when the user wants to set up Sarup, add the sarup MCP server, (re)connect it, install the auto-compression hook, or check that Sarup is working.
+description: Install, verify or extend the Sarup Thai-compression MCP server. Use when the user wants to set up Sarup, check that it works, turn on the optional Ollama modes (semantic, abstractive, pipeline), fix a Sarup result that carries a "setup" field, or install the auto-compression hook.
 ---
 
 # Sarup setup
 
-Set up **Sarup** — a Thai-first context-compression MCP server — for Claude Code.
-Sarup is an MCP server (tools `sarup_compress` / `sarup_retrieve` / `sarup_stats`),
-**not** an API proxy, so it can never break Claude Code: if it's down the tools just
-disappear and Claude keeps working.
+Sarup is an MCP server (tools `sarup_compress`, `sarup_retrieve`, `sarup_stats`) plus an
+optional hook that compresses large Read/Bash/Grep output. It is not an API proxy: if it
+is down, its tools disappear and nothing else breaks.
 
-Work through these steps. Stop and report if a step fails.
+Work through the steps in order and stop to report if one fails.
 
-## 1. Locate the Sarup repo
+## 1. Find out what is installed
 
-Find the clone directory (it contains `pyproject.toml` with `name = "sarup"` and a
-`scripts/` folder). In order:
+- Sarup tools named `mcp__plugin_sarup_sarup__*` are available: it is installed as a
+  **plugin**. Go to step 3.
+- Tools named `sarup_*` without the plugin prefix: it was installed **from a clone**. Go to
+  step 3; for clone maintenance see step 5.
+- No Sarup tools: go to step 2.
 
-1. If `$SARUP_HOME` is set, use it.
-2. If the current working directory is the Sarup repo, use it.
-3. Otherwise ask the user for the path. If they don't have it cloned, offer:
-   `git clone https://github.com/PHUICMT/sarup.git`
+## 2. Install (plugin, recommended)
 
-## 2. Run setup (creates venv, installs, registers the MCP at user scope)
+The plugin runs Sarup through `uvx`, so the machine needs **uv**. Check with `uv --version`.
+If it is missing, give the user the command for their OS and wait for them to run it:
 
-From the repo root:
+- Windows: `winget install astral-sh.uv` (or `powershell -c "irm https://astral.sh/uv/install.ps1 | iex"`)
+- macOS / Linux: `curl -LsSf https://astral.sh/uv/install.sh | sh`
 
-- **Windows (PowerShell):** `./scripts/setup.ps1 -All`
-- **Linux / WSL / macOS:** `./scripts/setup.sh --all`
+Then tell the user to type these two commands themselves (they are interactive
+commands, not shell commands):
 
-`-All` / `--all` also pulls the optional Ollama models (`nomic-embed-text`,
-`gemma4:e4b`) for the higher-ratio `semantic` / `pipeline` modes. Drop the flag for
-a minimal MCP-only install (offline `extractive` mode still works with no Ollama).
-
-If the scripts can't run, do it manually with the repo's venv python:
-
-```
-<venv-python> -m pip install -e <repo>
-claude mcp add sarup --scope user --env "SARUP_DB_PATH=<home>/.sarup-cache.db" -- <venv-python> -m sarup.server
+```text
+/plugin marketplace add PHUICMT/sarup
+/plugin install sarup@sarup
 ```
 
-(Windows venv python: `<repo>/.venv/Scripts/python.exe`; Unix: `<repo>/.venv/bin/python`.)
+After the install they reload (`/reload-plugins` or a new window). The first start takes
+a few seconds while uvx builds the environment.
 
 ## 3. Verify
 
-Run `claude mcp list` and confirm `sarup` shows **Connected**. Tell the user to
-**reload Claude Code** (the VS Code window or a new CLI session) so the tools load,
-then they can call `sarup_compress(content, mode="auto")` in any project.
+Call `sarup_stats`. Check:
 
-## 4. (Optional) auto-compression hook
+- `store` is a file path. "memory only" means the hook can't hand originals to the server;
+  for a clone install, set `SARUP_DB_PATH` on both (the plugin does this itself).
+- `backend` shows what the optional modes can use (next step).
 
-Only offer this if the user asks for automatic compression. The `PostToolUse` hook
-compresses large tool outputs (≥ `SARUP_HOOK_MIN_TOKENS`, default 400) and needs
-Claude Code ≥ 2.1.186.
+Then call `sarup_compress` on a few paragraphs of Thai text and confirm `verified: true`.
 
-⚠️ It compresses large `Bash`/`Grep` output, which can drop detail the model needs
-verbatim (recoverable via `sarup_retrieve`, but inconvenient mid-task). So **prefer
-installing it per-project** in documentation / Thai-heavy projects, and **skip it in
-code-heavy projects**. Ask the user which project before installing.
+## 4. Optional: Ollama for the higher-ratio modes
 
-Run `install.py` with the repo's venv python (paths inside it always point back at the
-Sarup repo, so the target project just references them):
+Without Ollama everything still works: the hook and the default `extractive` mode never
+use it. Only `semantic`, `abstractive` and `pipeline` need it, and they fall back to
+extractive with a `setup` field naming what is missing.
 
-- **This/that specific project (recommended):**
-  `<venv-python> <repo>/scripts/install.py --with-hook --project "<project-dir>"`
-  (omit the value to use the current directory: `--project`). Writes only the hook into
-  `<project-dir>/.claude/settings.json`; the MCP stays user-scoped.
-- **Every project (only if the user insists):** `… install.py --with-hook --global`
+Read `backend` from `sarup_stats` and offer only what is missing:
 
-To remove a per-project hook later:
-`<venv-python> <repo>/scripts/install.py --uninstall --project "<project-dir>"`.
-See `hooks/README.md` for tuning (`SARUP_HOOK_MIN_TOKENS`, `SARUP_HOOK_MODE`).
+| `backend` shows | What it enables | User runs |
+|---|---|---|
+| `"ollama": false` | anything below | install from https://ollama.com (Windows: `winget install Ollama.Ollama`, macOS: `brew install ollama`), then start it |
+| `"embed_model": null` | `semantic`, stage 1 of `pipeline` | `ollama pull nomic-embed-text` (274 MB) |
+| `"rewrite_model": null` | `abstractive`, stage 2 of `pipeline` | `ollama pull gemma4:12b` (7.6 GB, needs a GPU with about 8 GB or patience on CPU) |
 
-## Notes
+Explain the trade-off before the large download: on the Thai QA eval, `abstractive` kept
+91% of facts at 42% fewer tokens versus 69% at 30% for `extractive`, but it takes several
+seconds per call. Call `sarup_stats` again afterwards to confirm.
 
-- Safe by design: no `ANTHROPIC_BASE_URL` proxy, no persistent env routing.
-- Ollama is optional; modes degrade to offline `extractive` when it's down.
-- Uninstall cleanly: `./scripts/uninstall.ps1` (or `./scripts/uninstall.sh`).
+## 5. Clone installs only
+
+For a clone (development, or no plugin support), from the repo root:
+
+- Windows: `./scripts/setup.ps1 -All`
+- Linux / WSL / macOS: `./scripts/setup.sh --all`
+
+The hook for a single project:
+`<venv-python> <repo>/scripts/install.py --with-hook --project "<project-dir>"`
+(remove with `--uninstall --project "<project-dir>"`). The plugin installs the hook for
+every project; it skips source-file reads, but in code-heavy projects large Bash/Grep
+output may lose detail the model wants verbatim (recoverable with `sarup_retrieve`).
+
+## Troubleshooting
+
+- Hook seems to do nothing: set `SARUP_HOOK_LOG` to a file path before starting; each call
+  appends one JSON line saying whether it substituted.
+- Plugin MCP server fails to start: usually uv is missing or the first `uvx` build timed out;
+  run `uv --version`, then reload.

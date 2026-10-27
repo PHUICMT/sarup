@@ -22,6 +22,7 @@ from mcp.server.stdio import stdio_server
 from mcp.types import TextContent, Tool
 
 from .compressor import compress, estimate_tokens
+from .llm import backend_status, setup_hint
 from .store import CompressionStore, default_db_path
 from .tokens import token_method
 
@@ -92,7 +93,9 @@ class SarupServer:
                                     "(needs Ollama, slow). 'pipeline': cascade semantic -> "
                                     "abstractive for maximum savings. 'auto': semantic if Ollama "
                                     "is up, else extractive. All modes stay 100% recoverable via "
-                                    "sarup_retrieve."
+                                    "sarup_retrieve. If a mode falls back because Ollama or a "
+                                    "model is missing, the result has a 'setup' field saying "
+                                    "what to install."
                                 ),
                                 "default": "extractive",
                             },
@@ -119,7 +122,10 @@ class SarupServer:
                 ),
                 Tool(
                     name=STATS_TOOL,
-                    description="Return cumulative compression statistics for this session.",
+                    description=(
+                        "Return cumulative compression statistics, where the cache lives, and "
+                        "which optional Ollama models are available."
+                    ),
                     inputSchema={
                         "type": "object",
                         "properties": {},
@@ -187,6 +193,10 @@ class SarupServer:
             "token_method": token_method(),
         }
 
+        hint = setup_hint(mode)
+        if hint:
+            payload["setup"] = hint
+
         if result.tokens_saved > 0:
             payload["note"] = (
                 f"Original cached under hash '{h}'. […] marks omitted text; a fact "
@@ -217,6 +227,9 @@ class SarupServer:
             "total_compressed": self._total_calls,
             "total_tokens_saved": self._total_tokens_saved,
             "store_entries": self.store.size,
+            "store": _DB_PATH or "memory only (the hook can't share it; set SARUP_DB_PATH)",
+            # What the optional modes can use; anything None falls back to extractive.
+            "backend": backend_status(),
         }
         return [TextContent(type="text", text=json.dumps(payload, ensure_ascii=False))]
 

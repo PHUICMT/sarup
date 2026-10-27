@@ -49,7 +49,7 @@ if ($claude) {
 # 4. optional extras
 Write-Host "[4/4] Optional extras..."
 if ($Pull -and (Get-Command ollama -ErrorAction SilentlyContinue)) {
-    foreach ($m in @("nomic-embed-text", "gemma4:e4b")) { & ollama pull $m }
+    foreach ($m in @("nomic-embed-text", "gemma4:12b")) { & ollama pull $m }
 }
 if ($WithHook) { & $py (Join-Path $repo "scripts\install.py") --with-hook }
 if ($All) { & (Join-Path $repo "scripts\install-skill.ps1") }   # /sarup-setup anywhere
