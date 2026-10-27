@@ -1,19 +1,11 @@
-"""Tests for the PostToolUse auto-compression hook (hooks/sarup_hook.py)."""
+"""Tests for the PostToolUse auto-compression hook (sarup.hook)."""
 
-import importlib.util
 import json
-import os
-from pathlib import Path
 
 import pytest
 
+from sarup import hook as sarup_hook
 from sarup.store import CompressionStore
-
-# Load hooks/sarup_hook.py (not an installed package).
-_HOOK_PATH = Path(__file__).resolve().parent.parent / "hooks" / "sarup_hook.py"
-_spec = importlib.util.spec_from_file_location("sarup_hook", _HOOK_PATH)
-sarup_hook = importlib.util.module_from_spec(_spec)
-_spec.loader.exec_module(sarup_hook)
 
 BIG_THAI = "\n".join(
     [
@@ -68,7 +60,7 @@ def test_large_prose_is_compressed_and_recoverable(monkeypatch, tmp_path):
     out = sarup_hook.build_hook_output(_bash(BIG_THAI))
 
     assert out is not None
-    updated = out["hookSpecificOutput"]["updatedToolOutput"]
+    updated = out["hookSpecificOutput"]["updatedToolOutput"]["stdout"]
     assert len(updated) < len(BIG_THAI) + 400  # compressed (+ footer)
     assert "sarup_retrieve" in updated
 
@@ -99,8 +91,34 @@ def test_surrogate_output_does_not_crash(monkeypatch, tmp_path):
     json.dumps(out).encode("ascii")
 
 
+def test_plugin_data_dir_is_the_default_store(monkeypatch, tmp_path):
+    # As a plugin, server and hook share CLAUDE_PLUGIN_DATA with no SARUP_DB_PATH.
+    monkeypatch.delenv("SARUP_DB_PATH", raising=False)
+    monkeypatch.setenv("CLAUDE_PLUGIN_DATA", str(tmp_path / "data"))
+    monkeypatch.setattr(sarup_hook, "MIN_TOKENS", 100)
+    out = sarup_hook.build_hook_output(_bash(BIG_THAI))
+    assert out is not None
+    h = out["hookSpecificOutput"]["updatedToolOutput"]["stdout"].split("hash '")[1].split("'")[0]
+    store = CompressionStore(db_path=str(tmp_path / "data" / "sarup-cache.db"))
+    assert store.retrieve(h) == BIG_THAI
+
+
+def test_updated_output_keeps_each_tools_shape():
+    # The host drops an updatedToolOutput that doesn't match the tool's schema.
+    bash = {"stdout": "long", "stderr": "warn", "interrupted": False, "isImage": False}
+    assert sarup_hook._replace_output(bash, "short") == {
+        "stdout": "short", "stderr": "", "interrupted": False, "isImage": False}
+    read = {"type": "text", "file": {"filePath": "a.md", "content": "long", "numLines": 9}}
+    assert sarup_hook._replace_output(read, "short") == {
+        "type": "text", "file": {"filePath": "a.md", "content": "short", "numLines": 9}}
+    assert sarup_hook._replace_output({"mode": "content", "content": "long"}, "short") == {
+        "mode": "content", "content": "short"}
+    assert sarup_hook._replace_output("long", "short") == "short"
+
+
 def test_no_db_path_skips_substitution(monkeypatch):
     """Without a shared store, the original is unrecoverable → never substitute."""
     monkeypatch.delenv("SARUP_DB_PATH", raising=False)
+    monkeypatch.delenv("CLAUDE_PLUGIN_DATA", raising=False)
     monkeypatch.setattr(sarup_hook, "MIN_TOKENS", 100)
     assert sarup_hook.build_hook_output(_bash(BIG_THAI)) is None

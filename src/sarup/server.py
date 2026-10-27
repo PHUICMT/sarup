@@ -15,7 +15,6 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
-import os
 from typing import Any
 
 from mcp.server import Server
@@ -23,7 +22,7 @@ from mcp.server.stdio import stdio_server
 from mcp.types import TextContent, Tool
 
 from .compressor import compress, estimate_tokens
-from .store import CompressionStore
+from .store import CompressionStore, default_db_path
 from .tokens import token_method
 
 logger = logging.getLogger("sarup.server")
@@ -32,7 +31,7 @@ COMPRESS_TOOL = "sarup_compress"
 RETRIEVE_TOOL = "sarup_retrieve"
 STATS_TOOL = "sarup_stats"
 
-_DB_PATH: str | None = os.environ.get("SARUP_DB_PATH") or None
+_DB_PATH: str | None = default_db_path()
 
 
 class SarupServer:

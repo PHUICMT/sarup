@@ -1,0 +1,15 @@
+{
+  "name": "sarup",
+  "description": "Sarup: Thai-first context compression for long tool outputs.",
+  "owner": {
+    "name": "PHUCHANNN",
+    "url": "https://github.com/PHUICMT"
+  },
+  "plugins": [
+    {
+      "name": "sarup",
+      "source": "./",
+      "description": "Thai-first context compression MCP server with an automatic compression hook."
+    }
+  ]
+}

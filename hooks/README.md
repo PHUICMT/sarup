@@ -6,13 +6,15 @@ Compress large tool outputs **automatically** — no need for the model to call
 (`updatedToolOutput`), and caches the original so `sarup_retrieve(hash)` still
 recovers it byte-for-byte.
 
-> **Experimental — verify on your build.** The hook is invoked and emits a valid
-> `updatedToolOutput`, but *applying* it is surface-dependent: as of testing the **VS Code
-> extension (2.1.193) does not apply it** (verified live — the model still receives the full
-> output), so it's a no-op there. The Claude Code
-> [hooks docs](https://code.claude.com/docs/en/hooks) describe `updatedToolOutput` as
-> replacing the result, so it may work on other/CLI builds. The manual `sarup_compress`
-> tool works everywhere.
+> **Fixed in October 2026.** Earlier versions returned the compressed text as a plain
+> string, which Claude Code drops for built-in tools: `updatedToolOutput` must keep the
+> tool's own shape (`{stdout, stderr, …}` for Bash, `{type, file: {content, …}}` for Read).
+> That is why the hook looked like a no-op on every surface. It now keeps the shape;
+> verified on the CLI (2.1.289) through the plugin. Set `SARUP_HOOK_LOG` to a file path to
+> see one JSON line per call on your own build.
+
+The [plugin](../README.md#as-a-claude-code-plugin-easiest) installs and wires this hook
+for you; the rest of this page is for installs from a clone.
 
 ## How it stays 100% accurate
 
@@ -44,20 +46,17 @@ clone path (on Linux/macOS the interpreter is `<SARUP_DIR>/.venv/bin/python`):
         "hooks": [
           {
             "type": "command",
-            "command": "<SARUP_DIR>/.venv/Scripts/python.exe <SARUP_DIR>/hooks/sarup_hook.py",
+            "command": "<SARUP_DIR>/.venv/Scripts/sarup-hook --db <SARUP_DIR>/.sarup-cache.db",
             "timeout": 15
           }
         ]
       }
     ]
-  },
-  "env": {
-    "SARUP_DB_PATH": "<SARUP_DIR>/.sarup-cache.db"
   }
 }
 ```
 
-Point the MCP server at the **same** `SARUP_DB_PATH` so retrieval works across
+Point the MCP server at the **same** file (`SARUP_DB_PATH`) so retrieval works across
 processes. **For code-heavy projects, prefer per-project install (or skip the hook)** —
 it skips source-file reads, but compressing large `Bash`/`Grep` output can drop detail
 the model may want verbatim.
@@ -67,8 +66,9 @@ the model may want verbatim.
 | Var | Default | Meaning |
 |-----|---------|---------|
 | `SARUP_HOOK_MIN_TOKENS` | `400` | Only compress outputs with at least this many tokens (token-based so it's fair across Thai/English/code) |
-| `SARUP_HOOK_MODE` | `auto` | `auto` (semantic if Ollama is up, else extractive), or force `extractive` (offline, ~1ms) / `semantic` (Ollama, higher ratio, slower) |
-| `SARUP_DB_PATH` | *(in-memory)* | Shared SQLite store — **required** for cross-process retrieval |
+| `SARUP_HOOK_MODE` | `extractive` | `extractive` (offline, ~1 ms), or `auto` / `semantic` (Ollama, ~2 s per call; on Windows `auto` also costs ~2 s when Ollama is absent) |
+| `SARUP_DB_PATH` | *(in-memory)* | Shared SQLite store, **required** for cross-process retrieval. `sarup-hook --db PATH` sets it too |
+| `SARUP_HOOK_LOG` | *(off)* | File to append one JSON line per hook call: event, tool, size, whether it substituted |
 
 ## Safety
 

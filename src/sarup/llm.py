@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import json
 import os
+import time
 import urllib.error
 import urllib.request
 
@@ -34,6 +35,26 @@ _PROBE_TIMEOUT = float(os.environ.get("SARUP_OLLAMA_PROBE_TIMEOUT", "1.0"))
 _GEN_TIMEOUT = float(os.environ.get("SARUP_OLLAMA_GEN_TIMEOUT", "60.0"))
 _EMBED_TIMEOUT = float(os.environ.get("SARUP_OLLAMA_EMBED_TIMEOUT", "30.0"))
 
+# On Windows a refused connection takes ~2 s to report, and every Ollama-backed
+# mode tries embed/list/generate in turn. After one refusal, treat Ollama as
+# absent for a while so the rest fall back to extractive at once.
+_DOWN_SECONDS = 60.0
+_down_until = 0.0
+
+
+def _urlopen(req: urllib.request.Request, timeout: float):
+    global _down_until
+    if time.monotonic() < _down_until:
+        raise ConnectionRefusedError("Ollama was unreachable moments ago")
+    try:
+        return urllib.request.urlopen(req, timeout=timeout)
+    except urllib.error.HTTPError:
+        raise
+    except (urllib.error.URLError, ConnectionError) as e:
+        if isinstance(getattr(e, "reason", e), ConnectionError):
+            _down_until = time.monotonic() + _DOWN_SECONDS
+        raise
+
 
 def _post(path: str, body: dict, timeout: float) -> dict:
     data = json.dumps(body).encode("utf-8")
@@ -43,7 +64,7 @@ def _post(path: str, body: dict, timeout: float) -> dict:
         headers={"Content-Type": "application/json"},
         method="POST",
     )
-    with urllib.request.urlopen(req, timeout=timeout) as resp:
+    with _urlopen(req, timeout=timeout) as resp:
         return json.loads(resp.read().decode("utf-8"))
 
 
@@ -51,7 +72,7 @@ def ollama_available(timeout: float = _PROBE_TIMEOUT) -> bool:
     """True if an Ollama server answers on OLLAMA_HOST."""
     try:
         req = urllib.request.Request(f"{OLLAMA_HOST}/api/tags", method="GET")
-        with urllib.request.urlopen(req, timeout=timeout) as resp:
+        with _urlopen(req, timeout=timeout) as resp:
             return resp.status == 200
     except Exception:
         return False
@@ -60,7 +81,7 @@ def ollama_available(timeout: float = _PROBE_TIMEOUT) -> bool:
 def list_models(timeout: float = _PROBE_TIMEOUT) -> list[str]:
     try:
         req = urllib.request.Request(f"{OLLAMA_HOST}/api/tags", method="GET")
-        with urllib.request.urlopen(req, timeout=timeout) as resp:
+        with _urlopen(req, timeout=timeout) as resp:
             data = json.loads(resp.read().decode("utf-8"))
         return [m.get("name", "") for m in data.get("models", [])]
     except Exception:

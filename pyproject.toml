@@ -24,6 +24,12 @@ dev = [
 
 [project.scripts]
 sarup = "sarup.server:main"
+sarup-hook = "sarup.hook:main"
+
+# uvx/uv cache a path install by pyproject.toml alone, so the plugin (uvx --from
+# its own directory) would keep running a stale build after a source edit.
+[tool.uv]
+cache-keys = [{ file = "pyproject.toml" }, { file = "src/**/*.py" }]
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/sarup"]

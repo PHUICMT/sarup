@@ -1,0 +1,21 @@
+{
+  "name": "sarup",
+  "description": "Thai-first context compression: shrinks large tool outputs (Thai and English) and keeps every original one sarup_retrieve away.",
+  "author": {
+    "name": "PHUCHANNN",
+    "url": "https://github.com/PHUICMT"
+  },
+  "homepage": "https://github.com/PHUICMT/sarup",
+  "repository": "https://github.com/PHUICMT/sarup",
+  "license": "MIT",
+  "keywords": ["thai", "compression", "context", "tokens", "mcp"],
+  "mcpServers": {
+    "sarup": {
+      "command": "uvx",
+      "args": ["--from", "${CLAUDE_PLUGIN_ROOT}", "sarup"],
+      "env": {
+        "SARUP_DB_PATH": "${CLAUDE_PLUGIN_DATA}/sarup-cache.db"
+      }
+    }
+  }
+}

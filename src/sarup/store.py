@@ -3,10 +3,33 @@
 from __future__ import annotations
 
 import hashlib
+import os
 import sqlite3
 import time
 from dataclasses import dataclass
 from typing import Optional
+
+DB_FILENAME = "sarup-cache.db"
+
+
+def default_db_path() -> Optional[str]:
+    """Where the shared store lives: SARUP_DB_PATH, else the plugin's data dir.
+
+    The plugin passes SARUP_DB_PATH (server env) and `--db` (hook args) under
+    its data directory, which survives plugin updates; CLAUDE_PLUGIN_DATA is a
+    fallback for hosts that export it. Without either there is no shared store
+    (memory only). The parent directory is created if missing.
+    """
+    path = os.environ.get("SARUP_DB_PATH")
+    if not path:
+        data_dir = os.environ.get("CLAUDE_PLUGIN_DATA")
+        if not data_dir:
+            return None
+        path = os.path.join(data_dir, DB_FILENAME)
+    parent = os.path.dirname(path)
+    if parent:
+        os.makedirs(parent, exist_ok=True)
+    return path
 
 
 @dataclass

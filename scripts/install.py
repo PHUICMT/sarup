@@ -84,9 +84,10 @@ def recommend(models: list[str] | None) -> dict:
         return {"ollama": False, "hook_mode": "extractive", "embed": None, "gen": None}
     embed = _pick(models, _EMBED_PREFS)
     gen = _pick(models, _GEN_PREFS)
-    # semantic needs embeddings; without them, stay on offline extractive.
-    hook_mode = "auto" if embed else "extractive"
-    return {"ollama": True, "hook_mode": hook_mode, "embed": embed, "gen": gen}
+    # The hook runs on every Read/Bash/Grep: extractive is ~1 ms and kept at least
+    # as many facts as semantic (~2 s) in the QA eval, so it stays extractive even
+    # with Ollama up. Ollama still serves sarup_compress modes on request.
+    return {"ollama": True, "hook_mode": "extractive", "embed": embed, "gen": gen}
 
 
 # ── safe JSON merge ──────────────────────────────────────────────────────────

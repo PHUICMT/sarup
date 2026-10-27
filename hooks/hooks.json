@@ -1,0 +1,27 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "uvx --from \"${CLAUDE_PLUGIN_ROOT}\" sarup-hook --db \"${CLAUDE_PLUGIN_DATA}/sarup-cache.db\"",
+            "timeout": 300
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Read|Bash|Grep",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "uvx --from \"${CLAUDE_PLUGIN_ROOT}\" sarup-hook --db \"${CLAUDE_PLUGIN_DATA}/sarup-cache.db\"",
+            "timeout": 15
+          }
+        ]
+      }
+    ]
+  }
+}

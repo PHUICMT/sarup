@@ -227,8 +227,30 @@ The model keeps working on the 154-token view; the full 518-token original is on
 
 ## Install
 
+### As a Claude Code plugin (easiest)
+
+Needs [uv](https://docs.astral.sh/uv/): the plugin runs Sarup through `uvx`, which fetches
+Python and the dependencies on first use. Nothing to clone. In Claude Code:
+
+```text
+/plugin marketplace add PHUICMT/sarup
+/plugin install sarup@sarup
+```
+
+That installs the MCP server, the auto-compression hook and the `/sarup:sarup-setup` skill.
+The cache lives in the plugin's data directory, so it survives plugin updates. The first start
+takes a few seconds while `uvx` builds the environment. From a shell instead:
+`claude plugin marketplace add PHUICMT/sarup`, then `claude plugin install sarup@sarup`.
+
+Ollama is optional. Without it everything works offline: the hook and the default
+`extractive` mode never touch it, and asking for `semantic`, `abstractive` or `pipeline`
+quietly falls back to extractive (the result's `transforms` say which ran). Install
+[Ollama](https://ollama.com) and the models below only if you want those modes.
+
+### From a clone
+
 **One command** (creates the venv, installs everything, registers the MCP server
-for all projects — idempotent):
+for all projects, idempotent):
 
 ```powershell
 .\scripts\setup.ps1 -All      # Windows  (-All also adds the hook, the /sarup-setup skill, pulls Ollama models)
@@ -275,8 +297,9 @@ ollama pull gemma4:e4b           # rewrite → abstractive / pipeline (or gemma4
 
 - No Ollama? It configures offline `extractive` mode — still fully works.
 - Ollama up? It auto-selects `nomic-embed-text` (semantic) + the best installed rewrite model
-  (`gemma4:e4b` → `gemma4:12b` → `gemma3:12b` → `qwen3`)
-  and sets the hook to `auto`. `--pull` fetches any missing models.
+  (`gemma4:e4b` → `gemma4:12b` → `gemma3:12b` → `qwen3`) for `sarup_compress`.
+  The hook stays `extractive` either way (it runs on every tool call). `--pull` fetches
+  any missing models.
 - Idempotent — safe to re-run; `--global` writes to `~/.claude` instead.
 
 **Manual** — or add it yourself to your MCP config (e.g. `.mcp.json` or `~/.claude.json`).
@@ -309,12 +332,15 @@ Skip manual tool calls entirely: install the **PostToolUse hook** and large `Rea
 outputs are compressed before they enter context, with the original cached for retrieval.
 Source-code reads are skipped for safety. Full setup in **[hooks/README.md](hooks/README.md)**.
 
-> **Experimental — verify on your build.** The hook fires and emits a valid
-> `updatedToolOutput`, but whether Claude Code *applies* it is surface-dependent: as of
-> testing, the **VS Code extension (2.1.193) does NOT apply it** — the model still receives
-> the full output, so the hook is a no-op there. Use the manual `sarup_compress` tool
-> instead (it works everywhere); the hook may apply on other/CLI builds.
-> Replace `<SARUP_DIR>` with your clone path, or run `install.py --with-hook`.
+> **Fixed in October 2026.** Earlier versions returned the compressed text as a plain string.
+> Claude Code only accepts `updatedToolOutput` in the tool's own shape (`{stdout, stderr, …}`
+> for Bash, `{type, file: {content, …}}` for Read) and silently dropped the string, so the hook
+> never applied on any surface. It now keeps each tool's shape; verified on the CLI (2.1.289):
+> the model receives the compressed view and the retrieval hash. To see what the hook does on
+> your build, set `SARUP_HOOK_LOG` to a file path (one JSON line per call).
+
+The plugin wires this up for you. From a clone, replace `<SARUP_DIR>` with your clone path, or
+run `install.py --with-hook`:
 
 ```json
 {
@@ -322,10 +348,9 @@ Source-code reads are skipped for safety. Full setup in **[hooks/README.md](hook
     "PostToolUse": [
       { "matcher": "Read|Bash|Grep",
         "hooks": [{ "type": "command",
-          "command": "<SARUP_DIR>/.venv/Scripts/python.exe <SARUP_DIR>/hooks/sarup_hook.py" }] }
+          "command": "<SARUP_DIR>/.venv/Scripts/sarup-hook --db <SARUP_DIR>/.sarup-cache.db" }] }
     ]
-  },
-  "env": { "SARUP_DB_PATH": "<SARUP_DIR>/.sarup-cache.db" }
+  }
 }
 ```
 
@@ -353,8 +378,9 @@ the cache on restart, and the hook will not substitute — see the hook docs).
 | `OLLAMA_HOST`             | `http://localhost:11434` | Ollama endpoint.                                                                         |
 | `SARUP_ABSTRACTIVE_MODEL` | best installed           | Model for abstractive / pipeline rewrite. Unset: first installed of `gemma4:e4b`, `gemma4:12b`, `gemma3:12b`, `qwen3`. |
 | `SARUP_EMBED_MODEL`       | `nomic-embed-text`       | Model for semantic embeddings.                                                           |
-| `SARUP_HOOK_MODE`         | `auto`                   | Hook compression mode.                                                                   |
+| `SARUP_HOOK_MODE`         | `extractive`             | Hook compression mode. `auto`/`semantic` need Ollama and cost ~2 s per tool call.        |
 | `SARUP_HOOK_MIN_TOKENS`   | `400`                    | Hook only compresses outputs with at least this many tokens (token-based, fair across languages). |
+| `SARUP_HOOK_LOG`          | *(off)*                  | File to append one JSON line per hook call (event, tool, size, substituted).             |
 
 ## Project structure
 
